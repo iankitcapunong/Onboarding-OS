@@ -36,6 +36,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# large media not meant to live in git — externalize to a CDN/Supabase
+# Storage before production deploy (kept locally for dev only)
+/public/media/*.mp4
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
