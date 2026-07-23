@@ -12,8 +12,23 @@ const PRODUCTION_BROWSER_SOURCE_MAPS = false;
 // at different projects without editing this file.
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
-// The only third-party <script> this app loads (src/components/site/VoiceWidget.tsx).
-const LEADCONNECTOR_ORIGIN = "https://widgets.leadconnectorhq.com";
+// The only third-party <script> this app loads (src/components/site/VoiceWidget.tsx)
+// is the LeadConnector chat/voice widget — but its own runtime pulls in
+// several more of its subdomains (services.* for its session/config API,
+// stcdn.* for phone-input libraries) plus msgsndr.com (GoHighLevel's
+// backend infra — a session-attribution call) and a third-party font CDN
+// (fonts.bunny.net). All confirmed live by loading the page under this
+// CSP and watching devtools for violations. Wildcarding each vendor's
+// subdomains is simpler and more robust than enumerating each one, since
+// it's a black-box widget that may add more without notice.
+const LEADCONNECTOR_ORIGIN = "https://*.leadconnectorhq.com";
+const MSGSNDR_ORIGIN = "https://*.msgsndr.com";
+const BUNNY_FONTS_ORIGIN = "https://fonts.bunny.net";
+
+// React needs eval() in development for its debug/error-overlay tooling
+// (see node_modules/next/dist/docs/.../content-security-policy.md's own
+// "Good to know" note); not needed and not included in production.
+const IS_DEV = process.env.NODE_ENV === "development";
 
 // img-src/media-src are intentionally left at `https:` rather than a
 // pinned allowlist: generated-image/video URLs come back from kie.ai's
@@ -33,12 +48,12 @@ const CSP_DIRECTIVES = [
   // the inline BRIBLE_EDIT_JS script injected into the AI site preview's
   // srcDoc iframe without separate special-casing. See node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md's
   // own "Without Nonces" section for this exact trade-off.
-  `script-src 'self' 'unsafe-inline' ${LEADCONNECTOR_ORIGIN}`,
-  `style-src 'self' 'unsafe-inline'`,
+  `script-src 'self' 'unsafe-inline' ${LEADCONNECTOR_ORIGIN}${IS_DEV ? " 'unsafe-eval'" : ""}`,
+  `style-src 'self' 'unsafe-inline' ${BUNNY_FONTS_ORIGIN}`,
   `img-src 'self' blob: data: https:`,
   `media-src 'self' blob: https:`,
-  `font-src 'self'`,
-  `connect-src 'self' ${SUPABASE_URL} ${LEADCONNECTOR_ORIGIN}`,
+  `font-src 'self' ${BUNNY_FONTS_ORIGIN}`,
+  `connect-src 'self' ${SUPABASE_URL} ${LEADCONNECTOR_ORIGIN} ${MSGSNDR_ORIGIN}`,
   `object-src 'none'`,
   `base-uri 'self'`,
   `form-action 'self'`,
