@@ -6,61 +6,56 @@ import { useAuth } from "@/hooks/useAuth";
 import { useFeatureGating } from "@/hooks/useFeatureGating";
 import { useActivityLog } from "@/hooks/useActivityLog";
 import { useToast } from "@/components/app/ToastProvider";
-import { scopedKey, scanScopedSuffixes } from "@/lib/storage";
-import {
-  ADMIN_EMAILS,
-  FEATURES,
-  PLANS,
-  loadAccessFor,
-  saveAccessFor,
-  planFor,
-  type FeatureKey,
-} from "@/lib/featureGating";
+import { createClient } from "@/lib/supabase/client";
+import { callAdminClientsList, callAdminClientsSet, EdgeFunctionError, type AdminClient } from "@/lib/edgeFunctions";
+import { ADMIN_EMAILS, FEATURES, PLANS, planFor, type FeatureKey, type PlanKey } from "@/lib/featureGating";
 
-type Client = { email: string; name: string };
-
-/* "Known clients" mirrors the original's knownClients(): accounts that
-   have logged in / been configured on THIS browser. The original read a
-   demo-mode signup registry (bsl_users) that this rebuild dropped along
-   with the localStorage auth fallback (see Phase 2) — the closest
-   faithful equivalent with a real backend and no server-side admin API
-   is discovering every email an admin has ever set feature flags for,
-   via the bsl_features:<email> keys already scoped per account. */
-function knownClients(selfEmail: string): Client[] {
-  const seen = new Set<string>();
-  const list: Client[] = [];
-  function add(email: string) {
-    const key = email.trim().toLowerCase();
-    if (!key || seen.has(key)) return;
-    seen.add(key);
-    list.push({ email: key, name: key.split("@")[0] });
-  }
-  scanScopedSuffixes("bsl_features").forEach(add);
-  add(selfEmail);
-  return list;
+function initials(email: string) {
+  return email.slice(0, 2).toUpperCase();
 }
 
-function initials(name: string) {
-  return name.slice(0, 2).toUpperCase();
+function fullFlags(overrides: Partial<Record<FeatureKey, boolean>> | null): Record<FeatureKey, boolean> {
+  const flags = {} as Record<FeatureKey, boolean>;
+  FEATURES.forEach((f) => {
+    flags[f.key] = overrides ? overrides[f.key] !== false : true;
+  });
+  return flags;
 }
 
-function ClientRow({ client, onChange }: { client: Client; onChange: () => void }) {
+function ClientRow({
+  client,
+  supabase,
+  onChange,
+}: {
+  client: AdminClient;
+  supabase: ReturnType<typeof createClient>;
+  onChange: () => void;
+}) {
   const { logActivity } = useActivityLog();
   const toast = useToast();
   const isAdminAcct = ADMIN_EMAILS.includes(client.email);
-  const [flags, setFlags] = useState(() => loadAccessFor(client.email).features);
+  const [flags, setFlags] = useState(() => fullFlags(client.features));
+  // Adjust state during render (not via an effect) when the parent's
+  // refetch brings in a new features value for this client — a pure
+  // prop-driven reset, no external system involved.
+  const [trackedFeatures, setTrackedFeatures] = useState(client.features);
+  if (trackedFeatures !== client.features) {
+    setTrackedFeatures(client.features);
+    setFlags(fullFlags(client.features));
+  }
   const current = planFor(flags);
   const currentPlanLabel = PLANS.find((p) => p.key === current)?.label ?? "Custom";
+  const name = client.email.split("@")[0];
 
   if (isAdminAcct) {
     return (
       <div className="access-card is-admin">
         <div className="access-card-head">
           <span className="access-avatar is-admin" aria-hidden="true">
-            {initials(client.name)}
+            {initials(client.email)}
           </span>
           <div className="access-id">
-            <strong>{client.name}</strong>
+            <strong>{name}</strong>
             <span>{client.email}</span>
           </div>
           <span className="badge badge-admin">
@@ -77,43 +72,49 @@ function ClientRow({ client, onChange }: { client: Client; onChange: () => void 
     );
   }
 
+  async function persist(patch: { plan?: PlanKey; features?: Partial<Record<FeatureKey, boolean>> | null }) {
+    try {
+      await callAdminClientsSet(supabase, client.userId, patch);
+      onChange();
+    } catch (err) {
+      toast(err instanceof EdgeFunctionError && err.message ? err.message : "Couldn't update this client — try again in a moment.");
+    }
+  }
+
   function setPlan(planKey: (typeof PLANS)[number]["key"], planLabel: string, planFeatures: FeatureKey[]) {
     const next = { ...flags };
     FEATURES.forEach((f) => {
       next[f.key] = planFeatures.includes(f.key);
     });
     setFlags(next);
-    saveAccessFor(client.email, planKey, next);
+    void persist({ plan: planKey, features: next });
     logActivity("system", `Set ${client.email} to the ${planLabel} plan`);
-    toast(`${client.name} moved to ${planLabel}`, true);
-    onChange();
+    toast(`${name} moved to ${planLabel}`, true);
   }
 
   function toggleFeature(f: (typeof FEATURES)[number]) {
     const next = { ...flags, [f.key]: !flags[f.key] };
     setFlags(next);
-    saveAccessFor(client.email, planFor(next), next);
+    void persist({ plan: planFor(next), features: next });
     logActivity("system", `${next[f.key] ? "Enabled" : "Disabled"} ${f.label} for ${client.email}`);
-    toast(`${f.label}${next[f.key] ? " enabled" : " disabled"} for ${client.name}`, true);
-    onChange();
+    toast(`${f.label}${next[f.key] ? " enabled" : " disabled"} for ${name}`, true);
   }
 
   function handleReset() {
-    window.localStorage.removeItem(scopedKey("bsl_features", client.email));
-    setFlags(loadAccessFor(client.email).features);
+    setFlags(fullFlags(null));
+    void persist({ features: null });
     logActivity("system", `Reset access for ${client.email}`);
-    toast(`${client.name} reset to full access`, true);
-    onChange();
+    toast(`${name} reset to full access`, true);
   }
 
   return (
     <div className="access-card">
       <div className="access-card-head">
         <span className="access-avatar" aria-hidden="true">
-          {initials(client.name)}
+          {initials(client.email)}
         </span>
         <div className="access-id">
-          <strong>{client.name}</strong>
+          <strong>{name}</strong>
           <span>{client.email}</span>
         </div>
         <span className={`plan-tag${current === "custom" ? " is-custom" : ""}`}>{currentPlanLabel}</span>
@@ -176,19 +177,28 @@ export default function AccessPage() {
   const router = useRouter();
   const { user } = useAuth();
   const { isAdmin } = useFeatureGating();
-  const email = (user?.email || "").toLowerCase();
+  const [supabase] = useState(() => createClient());
+  const [clients, setClients] = useState<AdminClient[]>([]);
   const [refreshTick, forceRefresh] = useState(0);
 
   useEffect(() => {
     if (user && !isAdmin) router.replace("/app/dashboard");
   }, [user, isAdmin, router]);
 
-  // Recomputed from localStorage on every refreshTick bump — cheap (one
-  // prefix scan) and avoids the SSR/CSR mismatch a synced-via-effect
-  // state would need, since this whole page renders null until `isAdmin`
-  // resolves post-hydration anyway (see the early return below).
-  const clients = email ? knownClients(email) : [];
-  void refreshTick;
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    callAdminClientsList(supabase)
+      .then((res) => {
+        if (!cancelled) setClients(res.clients);
+      })
+      .catch(() => {
+        // best-effort — the page just shows an empty list on failure
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin, supabase, refreshTick]);
 
   function handleChange() {
     forceRefresh((n) => n + 1);
@@ -209,7 +219,7 @@ export default function AccessPage() {
       <div className="panel">
         <div className="access-list" aria-label="Client feature access">
           {clients.map((c) => (
-            <ClientRow key={c.email} client={c} onChange={handleChange} />
+            <ClientRow key={c.userId} client={c} supabase={supabase} onChange={handleChange} />
           ))}
         </div>
       </div>

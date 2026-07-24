@@ -4,7 +4,6 @@ import { useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { callProvisionProfile } from "@/lib/edgeFunctions";
-import { scopedKey, setJSON } from "@/lib/storage";
 import { FormAlert } from "./FormAlert";
 import { PasswordField } from "./PasswordField";
 
@@ -24,12 +23,6 @@ function trialEndFromNow() {
   const d = new Date();
   d.setDate(d.getDate() + TRIAL_DAYS);
   return d.toISOString();
-}
-
-/* Trial accounts get every feature switched on (mirrors PLANS.full in the
-   legacy js/app.js) so warm leads can explore the whole product. */
-function provisionTrialFeatures(email: string) {
-  setJSON(scopedKey("bsl_features", email), { plan: "full", features: {} });
 }
 
 export function TrialForm() {
@@ -126,10 +119,11 @@ export function TrialForm() {
       return;
     }
 
-    provisionTrialFeatures(lowerEmail);
-
     if (data.session) {
       try {
+        // Trial accounts get every feature switched on (mirrors PLANS.full)
+        // so warm leads can explore the whole product — seeded server-side
+        // in profiles.features by provision-profile's featuresForPlan().
         await callProvisionProfile(supabase, "full");
       } catch {
         // best-effort backstop, same as the paid signup flow — getPlan()

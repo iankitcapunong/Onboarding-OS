@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { FeatureKey, PlanKey } from "./featureGating";
 
 export class EdgeFunctionError extends Error {
   code?: string;
@@ -17,7 +18,7 @@ export class EdgeFunctionError extends Error {
    (detail > error > "fn-<status>"). */
 async function callEdgeFunction<T = unknown>(
   supabase: SupabaseClient,
-  name: "brible" | "imagegen" | "videogen" | "sheets-log" | "credits" | "provision-profile",
+  name: "brible" | "imagegen" | "videogen" | "sheets-log" | "credits" | "provision-profile" | "admin-clients",
   payload: unknown
 ): Promise<T> {
   const {
@@ -84,4 +85,29 @@ export function callCredits<T = { remaining?: number }>(supabase: SupabaseClient
 // an account's first call (subsequent calls are a no-op server-side).
 export function callProvisionProfile<T = { plan?: string }>(supabase: SupabaseClient, plan: string) {
   return callEdgeFunction<T>(supabase, "provision-profile", { plan });
+}
+
+export type AdminClient = {
+  userId: string;
+  email: string;
+  plan: PlanKey;
+  features: Partial<Record<FeatureKey, boolean>> | null;
+};
+
+// Real, server-verified client roster for the admin "Client access"
+// page — every actually-registered Supabase Auth user, left-joined
+// with their profiles row if one exists. See
+// supabase/functions/admin-clients/index.ts; admin-only, enforced
+// server-side against a mirrored ADMIN_EMAILS list, never trusting a
+// client-supplied "am I admin" flag.
+export function callAdminClientsList<T = { clients: AdminClient[] }>(supabase: SupabaseClient) {
+  return callEdgeFunction<T>(supabase, "admin-clients", { action: "list" });
+}
+
+export function callAdminClientsSet<T = AdminClient>(
+  supabase: SupabaseClient,
+  userId: string,
+  patch: { plan?: PlanKey; features?: Partial<Record<FeatureKey, boolean>> | null }
+) {
+  return callEdgeFunction<T>(supabase, "admin-clients", { action: "set", userId, ...patch });
 }

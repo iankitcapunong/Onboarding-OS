@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { callProvisionProfile } from "@/lib/edgeFunctions";
-import { getJSON, scopedKey, setJSON } from "@/lib/storage";
+import { getJSON } from "@/lib/storage";
 import { FormAlert } from "./FormAlert";
 import { PasswordField } from "./PasswordField";
 
@@ -31,10 +31,12 @@ function loginUrl() {
   return `${window.location.origin}/login`;
 }
 
-/* Mirrors js/auth.js's provisionFeatures(): derives a plan label from the
-   selected add-ons and writes the feature-gate flags a future dashboard
-   reads via useFeatureGating(), keyed exactly as "bsl_features:<email>". */
-function provisionFeatures(email: string, addons: string[]): string {
+/* Derives the plan label from the selected add-ons — the actual
+   feature-gate flags for this plan get seeded server-side by
+   provision-profile (see supabase/functions/provision-profile/index.ts's
+   featuresForPlan(), mirroring PLAN_FEATURES below) once provisionProfile()
+   is called with this returned plan. */
+function provisionFeatures(addons: string[]): string {
   const flags: Record<string, boolean> = {};
   [...DEFAULT_FEATURE_KEYS, ...ADDON_KEYS].forEach((k) => {
     flags[k] = (DEFAULT_FEATURE_KEYS as readonly string[]).includes(k) || addons.includes(k);
@@ -47,7 +49,6 @@ function provisionFeatures(email: string, addons: string[]): string {
       break;
     }
   }
-  setJSON(scopedKey("bsl_features", email), { plan, features: flags });
   return plan;
 }
 
@@ -163,7 +164,7 @@ export function SignupForm() {
       return;
     }
 
-    const plan = provisionFeatures(lowerEmail, addons);
+    const plan = provisionFeatures(addons);
 
     if (data.session) {
       await provisionProfile(plan);

@@ -1,9 +1,13 @@
-import { getJSON, scopedKey, setJSON } from "./storage";
-
 /* Ported 1:1 from js/app.js's FEATURE GATING / CREDITS sections. Admins
    decide which features each client account gets; a feature switched off
    disappears from that client's sidebar and its route falls back to the
-   dashboard. Admins always keep every feature and are unmetered. */
+   dashboard. Admins always keep every feature and are unmetered.
+
+   Per-account plan/features live server-side in Supabase's `profiles`
+   table now (see src/hooks/useFeatureGating.ts and
+   src/app/app/access/page.tsx) — this file only holds the shared
+   definitions (feature keys, plan presets, costs) both the client and
+   the Supabase Edge Functions need to agree on. */
 
 export const ADMIN_EMAILS: string[] = ["bryansumait.contact@gmail.com"];
 
@@ -62,32 +66,6 @@ export const CREDIT_COSTS: Record<string, number> = {
   videos: HIGH_COST,
   brible: HIGH_COST,
 };
-
-type StoredAccess = { plan?: PlanKey; features?: Partial<Record<FeatureKey, boolean>> } | Partial<Record<FeatureKey, boolean>> | null;
-
-function featureStoreKey(email: string) {
-  return scopedKey("bsl_features", email);
-}
-
-/* Missing/unknown feature keys default to enabled, so new features roll
-   out to everyone until an admin turns them off. */
-export function loadAccessFor(email: string) {
-  const raw = getJSON<StoredAccess>(featureStoreKey(email));
-  const rawPlan = raw && "plan" in raw ? raw.plan : undefined;
-  const preset = rawPlan ? PLANS.find((p) => p.key === rawPlan) : undefined;
-  const src = raw && "features" in raw ? raw.features : (raw as Partial<Record<FeatureKey, boolean>> | null);
-
-  const flags = {} as Record<FeatureKey, boolean>;
-  FEATURES.forEach((f) => {
-    flags[f.key] = preset ? preset.features.includes(f.key) : !src || src[f.key] !== false;
-  });
-
-  return { plan: rawPlan ?? null, features: flags, exists: !!raw };
-}
-
-export function saveAccessFor(email: string, plan: PlanKey | null, flags: Record<FeatureKey, boolean>) {
-  setJSON(featureStoreKey(email), { plan, features: flags });
-}
 
 export function planFor(flags: Record<FeatureKey, boolean>): PlanKey {
   for (const p of PLANS) {
