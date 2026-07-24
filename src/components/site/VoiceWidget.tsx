@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 
 const LOADER_SRC = "https://widgets.leadconnectorhq.com/loader.js";
 const RESOURCES_URL = "https://widgets.leadconnectorhq.com/chat-widget/loader.js";
-const WIDGET_ID = "6a4b63c6f73312b761c5f155";
+const WIDGET_ID = "6a6358b47dc24a6d502412cd";
 
 /* The LeadConnector loader script attaches its <chat-widget> element as a
    sibling of wherever its <script> tag lives, then renders its own launcher
