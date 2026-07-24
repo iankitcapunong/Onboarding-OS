@@ -77,21 +77,31 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
   const creditsKey = scopedKey("bsl_credits", email);
 
   const [creditState, setCreditState] = useState<CreditState>(freshState);
+  const creditAllowance = PLAN_CREDITS[planKey as PlanKey] ?? PLAN_CREDITS.custom;
 
   // `email` isn't known until useAuth's getUser() call resolves, so the
   // initial state above is a placeholder read under no particular
   // account. Re-hydrate from this account's real stored usage as soon as
   // the email is known (and again on account switch), instead of
   // silently sticking with the placeholder for the rest of the mount.
+  // withExhaustionCheck here matters on its own (not just the merge's
+  // sticky carry-forward): it's what locks a stored `used` that's
+  // already over the allowance but was never run through spendCredits/
+  // syncCreditsFromServer to get stamped — e.g. data from before this
+  // lock existed, or a plan downgrade that dropped the allowance below
+  // what's already been used this month.
   const hydratedForRef = useRef<string | null>(null);
   useEffect(() => {
     if (!email || hydratedForRef.current === email) return;
     hydratedForRef.current = email;
     const stored = getJSON<CreditState>(creditsKey);
-    setCreditState((prev) => merge(normalize(prev), normalize(stored)));
-  }, [email, creditsKey]);
+    setCreditState((prev) => {
+      const next = withExhaustionCheck(merge(normalize(prev), normalize(stored)), creditAllowance);
+      setJSON(creditsKey, next);
+      return next;
+    });
+  }, [email, creditsKey, creditAllowance]);
 
-  const creditAllowance = PLAN_CREDITS[planKey as PlanKey] ?? PLAN_CREDITS.custom;
   const creditsExhausted = !isAdmin && creditState.exhaustedMonth === thisMonth();
   const creditsLeft = creditsExhausted ? 0 : Math.max(0, creditAllowance - creditState.used);
 
