@@ -83,13 +83,13 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          // Mic is needed by the LeadConnector voice agent, which is injected
-          // into the top-level document (not an iframe) by
-          // src/components/site/AgentWidget.tsx and so needs top-level
-          // permission. The Web Speech API in src/hooks/useCallCapture.tsx
-          // would need it too, though nothing calls startCapture since the
-          // manual capture UI was removed from the agent page. Everything else
-          // stays denied by default.
+          // Mic is needed by the LeadConnector voice agent, injected into
+          // the top-level document (not an iframe) by
+          // src/components/site/AgentWidget.tsx, and by the Web Speech API
+          // in src/hooks/useCallCapture.tsx (the manual transcript-capture
+          // UI, restored alongside the agent on the onboarding flow page).
+          // Both need top-level permission. Everything else stays denied
+          // by default.
           { key: "Permissions-Policy", value: "microphone=(self), camera=(), geolocation=(), payment=()" },
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
         ],
