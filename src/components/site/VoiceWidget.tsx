@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 const LOADER_SRC = "https://widgets.leadconnectorhq.com/loader.js";
 const RESOURCES_URL = "https://widgets.leadconnectorhq.com/chat-widget/loader.js";
 const WIDGET_ID = "6a6358b47dc24a6d502412cd";
+const LOCATION_ID = "DF0hgE2BLIjnHvglyVyx";
 
 /* The LeadConnector loader script attaches its <chat-widget> element as a
    sibling of wherever its <script> tag lives, then renders its own launcher
@@ -22,6 +23,17 @@ export function VoiceWidget() {
     const container = containerRef.current;
     if (!container) return;
 
+    // GHL's current embed snippet pairs the loader script with an explicit
+    // host <div data-chat-widget>, carrying data-location-id — matches
+    // what the dashboard's "Get code" now generates (confirmed this alone
+    // doesn't fix the call button being inert; kept for parity with GHL's
+    // current snippet regardless).
+    const host = document.createElement("div");
+    host.setAttribute("data-chat-widget", "");
+    host.setAttribute("data-widget-id", WIDGET_ID);
+    host.setAttribute("data-location-id", LOCATION_ID);
+    container.appendChild(host);
+
     const script = document.createElement("script");
     script.src = LOADER_SRC;
     script.setAttribute("data-resources-url", RESOURCES_URL);
@@ -29,7 +41,7 @@ export function VoiceWidget() {
     container.appendChild(script);
 
     return () => {
-      container.querySelectorAll("script, chat-widget").forEach((el) => el.remove());
+      container.querySelectorAll("script, chat-widget, [data-chat-widget]").forEach((el) => el.remove());
     };
   }, []);
 
