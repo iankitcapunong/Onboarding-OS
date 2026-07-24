@@ -7,7 +7,13 @@ import { useToast } from "@/components/app/ToastProvider";
 import { getJSON, scopedKey, setJSON } from "@/lib/storage";
 import { CREDIT_COSTS, PLAN_CREDITS, PlanKey } from "@/lib/featureGating";
 
-type CreditState = { month: string; used: number };
+// `exhaustedMonth` is a sticky lock: once a user hits 0 credits in a
+// given month, it's stamped with that month and stays that way — even
+// if a later signal (another tab's stale write, a corrected server
+// balance) would otherwise put `used` back under the allowance — until
+// the calendar month actually changes. "Used up" should mean used up
+// for the rest of the month, not something that can flicker back.
+type CreditState = { month: string; used: number; exhaustedMonth: string | null };
 
 type CreditsContextValue = {
   creditsLeft: number;
@@ -23,17 +29,39 @@ function thisMonth() {
   return new Date().toISOString().slice(0, 7);
 }
 
-// Merges the freshest persisted usage with in-memory state, taking
-// whichever recorded more spending this month. Reading localStorage
-// fresh (rather than trusting a possibly-stale `creditState` closure)
-// and taking the max, rather than just overwriting, is what stops
-// concurrent writers — another tab, or two spends racing within this
-// one — from reverting `used` backward and handing back credits that
-// were already spent.
-function reconcileUsed(stored: CreditState | null, prev: CreditState): CreditState {
-  const prevUsed = prev.month === thisMonth() ? prev.used : 0;
-  const storedUsed = stored && stored.month === thisMonth() ? stored.used : 0;
-  return { month: thisMonth(), used: Math.max(prevUsed, storedUsed) };
+function freshState(): CreditState {
+  return { month: thisMonth(), used: 0, exhaustedMonth: null };
+}
+
+// Drops usage and the exhausted lock from a snapshot recorded in an
+// earlier month — a new month is a clean slate.
+function normalize(state: CreditState | null): CreditState {
+  if (!state || state.month !== thisMonth()) return freshState();
+  return state;
+}
+
+// Merges two same-month snapshots by taking whichever recorded more
+// spending — reading localStorage fresh and taking the max (rather
+// than just overwriting) is what stops concurrent writers, e.g.
+// another tab, from reverting `used` backward and handing back credits
+// that were already spent. The exhausted lock is sticky across the
+// merge too: if either snapshot already recorded exhaustion this
+// month, the result stays exhausted.
+function merge(a: CreditState, b: CreditState): CreditState {
+  return {
+    month: thisMonth(),
+    used: Math.max(a.used, b.used),
+    exhaustedMonth: a.exhaustedMonth === thisMonth() || b.exhaustedMonth === thisMonth() ? thisMonth() : null,
+  };
+}
+
+// Stamps the sticky lock the first time usage reaches the allowance.
+// Once stamped, callers should stop feeding this function a lower
+// `used` and instead treat the state as locked outright (see
+// syncCreditsFromServer below).
+function withExhaustionCheck(state: CreditState, allowance: number): CreditState {
+  if (state.exhaustedMonth === thisMonth() || state.used < allowance) return state;
+  return { ...state, exhaustedMonth: thisMonth() };
 }
 
 /* Direct replacement for js/app.js's CREDITS section (spendCredits(),
@@ -48,7 +76,7 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
   const email = (user?.email || "").toLowerCase();
   const creditsKey = scopedKey("bsl_credits", email);
 
-  const [creditState, setCreditState] = useState<CreditState>(() => ({ month: thisMonth(), used: 0 }));
+  const [creditState, setCreditState] = useState<CreditState>(freshState);
 
   // `email` isn't known until useAuth's getUser() call resolves, so the
   // initial state above is a placeholder read under no particular
@@ -60,12 +88,12 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
     if (!email || hydratedForRef.current === email) return;
     hydratedForRef.current = email;
     const stored = getJSON<CreditState>(creditsKey);
-    setCreditState((prev) => reconcileUsed(stored, prev));
+    setCreditState((prev) => merge(normalize(prev), normalize(stored)));
   }, [email, creditsKey]);
 
   const creditAllowance = PLAN_CREDITS[planKey as PlanKey] ?? PLAN_CREDITS.custom;
-  const creditsLeft = Math.max(0, creditAllowance - creditState.used);
-  const creditsExhausted = !isAdmin && creditsLeft <= 0;
+  const creditsExhausted = !isAdmin && creditState.exhaustedMonth === thisMonth();
+  const creditsLeft = creditsExhausted ? 0 : Math.max(0, creditAllowance - creditState.used);
 
   const spendCredits = useCallback(
     (kind: string, count = 1) => {
@@ -76,25 +104,37 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
       setCreditState((prev) => {
-        const merged = reconcileUsed(getJSON<CreditState>(creditsKey), prev);
-        const next = { ...merged, used: merged.used + cost };
+        const merged = merge(normalize(prev), normalize(getJSON<CreditState>(creditsKey)));
+        const next = withExhaustionCheck({ ...merged, used: merged.used + cost }, creditAllowance);
         setJSON(creditsKey, next);
         return next;
       });
       return true;
     },
-    [isAdmin, creditsLeft, creditsKey, toast]
+    [isAdmin, creditsLeft, creditsKey, creditAllowance, toast]
   );
 
-  // The Edge Function's response is authoritative (it already accounts
-  // for every writer — every tab, every device), so unlike spendCredits
-  // this intentionally overwrites rather than merging.
+  // The Edge Function's response is normally authoritative and would
+  // overwrite outright — except once the sticky exhausted lock is set
+  // for this month, in which case it's ignored: "used up" should hold
+  // for the rest of the month even if a later signal (a stale sync, a
+  // corrected server balance) would otherwise suggest credits again.
   const syncCreditsFromServer = useCallback(
     (remaining: number) => {
       if (isAdmin || typeof remaining !== "number") return;
-      const next = { month: thisMonth(), used: Math.max(0, creditAllowance - remaining) };
-      setCreditState(next);
-      setJSON(creditsKey, next);
+      setCreditState((prev) => {
+        const current = normalize(prev);
+        if (current.exhaustedMonth === thisMonth()) {
+          setJSON(creditsKey, current);
+          return current;
+        }
+        const next = withExhaustionCheck(
+          { month: thisMonth(), used: Math.max(0, creditAllowance - remaining), exhaustedMonth: null },
+          creditAllowance
+        );
+        setJSON(creditsKey, next);
+        return next;
+      });
     },
     [isAdmin, creditAllowance, creditsKey]
   );

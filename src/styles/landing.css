@@ -411,6 +411,10 @@ main,
   display: flex;
   justify-content: center;
   min-height: 80px;
+  /* Establishes a containing block so the LeadConnector widget's
+     `position: fixed` launcher is trapped inside this box instead of
+     floating over the whole viewport. */
+  transform: translateZ(0);
 }
 
 .voice-note {
