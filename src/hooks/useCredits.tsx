@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "./useAuth";
 import { useFeatureGating } from "./useFeatureGating";
 import { useToast } from "@/components/app/ToastProvider";
@@ -35,11 +35,20 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
   const email = (user?.email || "").toLowerCase();
   const creditsKey = scopedKey("bsl_credits", email);
 
-  const [creditState, setCreditState] = useState<CreditState>(() => {
+  const [creditState, setCreditState] = useState<CreditState>(() => ({ month: thisMonth(), used: 0 }));
+
+  // `email` isn't known until useAuth's getUser() call resolves, so the
+  // initial state above is a placeholder read under no particular
+  // account. Re-hydrate from this account's real stored usage as soon as
+  // the email is known (and again on account switch), instead of
+  // silently sticking with the placeholder for the rest of the mount.
+  const hydratedForRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!email || hydratedForRef.current === email) return;
+    hydratedForRef.current = email;
     const stored = getJSON<CreditState>(creditsKey);
-    if (stored && stored.month === thisMonth()) return stored;
-    return { month: thisMonth(), used: 0 };
-  });
+    setCreditState(stored && stored.month === thisMonth() ? stored : { month: thisMonth(), used: 0 });
+  }, [email, creditsKey]);
 
   const creditAllowance = PLAN_CREDITS[planKey as PlanKey] ?? PLAN_CREDITS.custom;
   const creditsLeft = Math.max(0, creditAllowance - creditState.used);
