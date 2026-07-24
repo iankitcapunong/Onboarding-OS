@@ -55,9 +55,6 @@ export function Topbar({ title, onMenuClick }: { title: string; onMenuClick: () 
       </button>
       <h1 className="topbar-title">{title}</h1>
       <div className="topbar-right">
-        <span className="agent-status">
-          <span className="status-dot" aria-hidden="true" /> System live
-        </span>
         <div className="user-menu">
           <button
             type="button"

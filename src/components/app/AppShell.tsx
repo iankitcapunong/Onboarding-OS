@@ -38,7 +38,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <CreditsExhaustedModal />
 
       <aside className={`sidebar${sidebarOpen ? " open" : ""}`}>
-        <Link href="/" className="brand sidebar-brand" aria-label="Onboarding OS home">
+        <Link href="/app/dashboard" className="brand sidebar-brand" aria-label="Onboarding OS home">
           <BrandMarkIcon />
         </Link>
 
