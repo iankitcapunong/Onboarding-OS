@@ -4,7 +4,6 @@ import { BrandMark } from "@/components/site/BrandMark";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { BgGlobe } from "@/components/site/BgGlobe";
 import { PageMotion } from "@/components/site/PageMotion";
-import { VoiceWidget } from "@/components/site/VoiceWidget";
 
 export const metadata: Metadata = {
   title: "Onboarding OS · The System for Client Onboarding",
@@ -65,22 +64,6 @@ export default function HomePage() {
               <a href="#features" className="btn btn-ghost-light btn-lg">See what&apos;s inside</a>
             </div>
             <p className="hero-note">A full tour of the platform — the onboarding flow, the dashboard, and everything it generates</p>
-          </div>
-        </section>
-
-        <section className="section" id="voice-sample">
-          <div className="container container-narrow">
-            <div className="voice-panel">
-              <span className="voice-eyebrow">Not a recording</span>
-              <h2>Hear the actual AI voice agent, live</h2>
-              <p className="voice-sub">This is the same voice agent your clients talk to during onboarding — not a script, not a voiceover. Click below and talk to it yourself.</p>
-              <div className="voice-box">
-                <div className="voice-widget-slot">
-                  <VoiceWidget />
-                </div>
-              </div>
-              <p className="voice-note">Please allow microphone access when prompted so the AI specialist can hear you.</p>
-            </div>
           </div>
         </section>
 

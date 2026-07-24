@@ -12,17 +12,8 @@ const PRODUCTION_BROWSER_SOURCE_MAPS = false;
 // at different projects without editing this file.
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
-// The only third-party <script> this app loads (src/components/site/VoiceWidget.tsx)
-// is the LeadConnector chat/voice widget — but its own runtime pulls in
-// several more of its subdomains (services.* for its session/config API,
-// stcdn.* for phone-input libraries) plus msgsndr.com (GoHighLevel's
-// backend infra — a session-attribution call) and a third-party font CDN
-// (fonts.bunny.net). All confirmed live by loading the page under this
-// CSP and watching devtools for violations. Wildcarding each vendor's
-// subdomains is simpler and more robust than enumerating each one, since
-// it's a black-box widget that may add more without notice.
-const LEADCONNECTOR_ORIGIN = "https://*.leadconnectorhq.com";
-const MSGSNDR_ORIGIN = "https://*.msgsndr.com";
+// A third-party font CDN (fonts.bunny.net) — confirmed live by loading
+// the page under this CSP and watching devtools for violations.
 const BUNNY_FONTS_ORIGIN = "https://fonts.bunny.net";
 
 // React needs eval() in development for its debug/error-overlay tooling
@@ -48,12 +39,12 @@ const CSP_DIRECTIVES = [
   // the inline BRIBLE_EDIT_JS script injected into the AI site preview's
   // srcDoc iframe without separate special-casing. See node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md's
   // own "Without Nonces" section for this exact trade-off.
-  `script-src 'self' 'unsafe-inline' ${LEADCONNECTOR_ORIGIN}${IS_DEV ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline'${IS_DEV ? " 'unsafe-eval'" : ""}`,
   `style-src 'self' 'unsafe-inline' ${BUNNY_FONTS_ORIGIN}`,
   `img-src 'self' blob: data: https:`,
   `media-src 'self' blob: https:`,
   `font-src 'self' ${BUNNY_FONTS_ORIGIN}`,
-  `connect-src 'self' ${SUPABASE_URL} ${LEADCONNECTOR_ORIGIN} ${MSGSNDR_ORIGIN}`,
+  `connect-src 'self' ${SUPABASE_URL}`,
   `object-src 'none'`,
   `base-uri 'self'`,
   `form-action 'self'`,
@@ -77,9 +68,7 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           // Mic is used first-party by the Web Speech API in
-          // src/hooks/useCallCapture.tsx and by the LeadConnector widget
-          // (injected into the top-level document, not an iframe, by
-          // src/components/site/VoiceWidget.tsx) — both need top-level
+          // src/hooks/useCallCapture.tsx, which needs top-level
           // permission. Everything else stays denied by default.
           { key: "Permissions-Policy", value: "microphone=(self), camera=(), geolocation=(), payment=()" },
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
