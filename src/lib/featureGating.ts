@@ -5,7 +5,7 @@ import { getJSON, scopedKey, setJSON } from "./storage";
    disappears from that client's sidebar and its route falls back to the
    dashboard. Admins always keep every feature and are unmetered. */
 
-export const ADMIN_EMAILS: string[] = [];
+export const ADMIN_EMAILS: string[] = ["bryansumait.contact@gmail.com"];
 
 export type FeatureKey =
   | "agent"
