@@ -7,7 +7,13 @@ import { useFeatureGating } from "@/hooks/useFeatureGating";
 import { useActivityLog } from "@/hooks/useActivityLog";
 import { useToast } from "@/components/app/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
-import { callAdminClientsList, callAdminClientsSet, EdgeFunctionError, type AdminClient } from "@/lib/edgeFunctions";
+import {
+  callAdminClientsAdjustCredits,
+  callAdminClientsList,
+  callAdminClientsSet,
+  EdgeFunctionError,
+  type AdminClient,
+} from "@/lib/edgeFunctions";
 import { ADMIN_EMAILS, FEATURES, PLANS, planFor, type FeatureKey, type PlanKey } from "@/lib/featureGating";
 
 function initials(email: string) {
@@ -46,6 +52,8 @@ function ClientRow({
   const current = planFor(flags);
   const currentPlanLabel = PLANS.find((p) => p.key === current)?.label ?? "Custom";
   const name = client.email.split("@")[0];
+  const [creditAmount, setCreditAmount] = useState("");
+  const [adjusting, setAdjusting] = useState(false);
 
   if (isAdminAcct) {
     return (
@@ -107,6 +115,26 @@ function ClientRow({
     toast(`${name} reset to full access`, true);
   }
 
+  async function adjustCredits(sign: 1 | -1) {
+    const parsed = Math.trunc(Number(creditAmount));
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      toast("Enter a positive credit amount first");
+      return;
+    }
+    setAdjusting(true);
+    try {
+      await callAdminClientsAdjustCredits(supabase, client.userId, sign * parsed);
+      onChange();
+      setCreditAmount("");
+      logActivity("system", `${sign > 0 ? "Added" : "Deducted"} ${parsed} credits for ${client.email}`);
+      toast(`${sign > 0 ? "Added" : "Deducted"} ${parsed} credits for ${name}`, true);
+    } catch (err) {
+      toast(err instanceof EdgeFunctionError && err.message ? err.message : "Couldn't update credits — try again in a moment.");
+    } finally {
+      setAdjusting(false);
+    }
+  }
+
   return (
     <div className="access-card">
       <div className="access-card-head">
@@ -157,6 +185,40 @@ function ClientRow({
               <span className="feat-toggle-label">{f.label}</span>
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="access-section">
+        <span className="access-section-label">Credits this month</span>
+        <div className="row-between" style={{ marginBottom: 6 }}>
+          <span className="panel-sub" style={{ margin: 0 }}>
+            {client.credits.remaining} / {client.credits.allowance} remaining
+          </span>
+        </div>
+        <div className="meter">
+          <div
+            className="meter-fill"
+            style={{ width: `${Math.min(100, Math.round((client.credits.remaining / Math.max(1, client.credits.allowance)) * 100))}%` }}
+          />
+        </div>
+        <div className="credit-adjust-row">
+          <label className="sr-only" htmlFor={`creditAmt-${client.userId}`}>Credit amount</label>
+          <input
+            className="input credit-amount-input"
+            id={`creditAmt-${client.userId}`}
+            type="number"
+            min="1"
+            placeholder="Amount"
+            value={creditAmount}
+            onChange={(e) => setCreditAmount(e.target.value)}
+            disabled={adjusting}
+          />
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => adjustCredits(1)} disabled={adjusting}>
+            Add credits
+          </button>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => adjustCredits(-1)} disabled={adjusting}>
+            Reduce credits
+          </button>
         </div>
       </div>
 

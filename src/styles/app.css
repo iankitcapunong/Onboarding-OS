@@ -3728,6 +3728,21 @@ body.brible-active .app-main { padding: 0; max-width: none; }
 .access-actions { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
 .access-actions .btn svg { margin-right: 6px; }
 
+.credit-adjust-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.credit-amount-input {
+  width: 110px;
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
 /* ---- Social studio ---- */
 .social-genrow { margin-top: 14px; }
 

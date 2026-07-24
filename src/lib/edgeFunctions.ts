@@ -87,11 +87,14 @@ export function callProvisionProfile<T = { plan?: string }>(supabase: SupabaseCl
   return callEdgeFunction<T>(supabase, "provision-profile", { plan });
 }
 
+export type ClientCredits = { allowance: number; used: number; remaining: number };
+
 export type AdminClient = {
   userId: string;
   email: string;
   plan: PlanKey;
   features: Partial<Record<FeatureKey, boolean>> | null;
+  credits: ClientCredits;
 };
 
 // Real, server-verified client roster for the admin "Client access"
@@ -110,4 +113,16 @@ export function callAdminClientsSet<T = AdminClient>(
   patch: { plan?: PlanKey; features?: Partial<Record<FeatureKey, boolean>> | null }
 ) {
   return callEdgeFunction<T>(supabase, "admin-clients", { action: "set", userId, ...patch });
+}
+
+// Grants (positive amount) or deducts (negative amount) credits for this
+// user's current billing month — see supabase/functions/admin-clients/
+// index.ts's "adjustCredits" action, which moves the same usage_counters
+// bucket real spends do.
+export function callAdminClientsAdjustCredits<T = { userId: string; credits: ClientCredits }>(
+  supabase: SupabaseClient,
+  userId: string,
+  amount: number
+) {
+  return callEdgeFunction<T>(supabase, "admin-clients", { action: "adjustCredits", userId, amount });
 }
