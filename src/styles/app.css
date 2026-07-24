@@ -3540,26 +3540,97 @@ body.brible-active .app-main { padding: 0; max-width: none; }
   background: linear-gradient(135deg, var(--warning), #b45309);
 }
 
-.access-row {
-  padding: 18px 0;
-  border-bottom: 1px solid var(--border);
+.access-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.access-row:first-child { padding-top: 4px; }
-.access-row:last-child { border-bottom: none; padding-bottom: 4px; }
+.access-card {
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+  transition: border-color 0.15s ease;
+}
+
+.access-card:hover { border-color: var(--border-strong); }
+
+.access-card.is-admin {
+  border-color: rgba(217, 119, 6, 0.35);
+  background: var(--warning-soft);
+}
+
+.access-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.access-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  font: 700 12.5px var(--font-body);
+  color: #fff;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+}
+
+.access-avatar.is-admin {
+  background: linear-gradient(135deg, var(--warning), #b45309);
+}
 
 .access-id {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
 }
 
 .access-id strong { font-size: 14.5px; color: var(--ink); }
 .access-id span { font-size: 12.5px; color: var(--ink-3); }
 
-.access-note { margin: 0; }
+.access-note { margin: 0; color: var(--ink-3); }
+
+.badge-admin {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.plan-tag {
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  font: 600 11.5px var(--font-body);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.plan-tag.is-custom {
+  border-style: dashed;
+  border-color: var(--warning);
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.access-section { margin-bottom: 14px; }
+.access-section:last-of-type { margin-bottom: 0; }
+
+.access-section-label {
+  display: block;
+  margin-bottom: 8px;
+  font: 700 11px var(--font-body);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
 
 .feat-grid {
   display: flex;
@@ -3567,11 +3638,14 @@ body.brible-active .app-main { padding: 0; max-width: none; }
   gap: 8px;
 }
 
+/* Feature toggles read as switches (track + sliding thumb) rather than a
+   colored dot, so on/off is legible from shape and position, not color
+   alone — the dot-only version left "off" and "on" too close visually. */
 .feat-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 7px 13px;
+  gap: 8px;
+  padding: 6px 13px 6px 6px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -3582,14 +3656,28 @@ body.brible-active .app-main { padding: 0; max-width: none; }
 }
 
 .feat-toggle:hover { border-color: var(--border-strong); }
+.feat-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
-.feat-toggle .feat-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+.feat-toggle-track {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  border-radius: 999px;
   background: var(--border-strong);
   flex-shrink: 0;
-  transition: background 0.15s ease, box-shadow 0.15s ease;
+  transition: background 0.15s ease;
+}
+
+.feat-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease;
 }
 
 .feat-toggle.on {
@@ -3598,17 +3686,14 @@ body.brible-active .app-main { padding: 0; max-width: none; }
   color: var(--primary-700);
 }
 
-.feat-toggle.on .feat-dot {
-  background: var(--success);
-  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.16);
-}
+.feat-toggle.on .feat-toggle-track { background: var(--success); }
+.feat-toggle.on .feat-toggle-thumb { transform: translateX(12px); }
 
 /* ---- Client access: plans, actions ---- */
 .plan-pills {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 12px;
 }
 
 .plan-pill {
@@ -3623,6 +3708,7 @@ body.brible-active .app-main { padding: 0; max-width: none; }
 }
 
 .plan-pill:hover { border-color: var(--border-strong); }
+.plan-pill:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
 .plan-pill.active {
   border-color: transparent;
@@ -3639,7 +3725,8 @@ body.brible-active .app-main { padding: 0; max-width: none; }
   background: var(--warning-soft);
 }
 
-.access-actions { margin-top: 12px; }
+.access-actions { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.access-actions .btn svg { margin-right: 6px; }
 
 /* ---- Social studio ---- */
 .social-genrow { margin-top: 14px; }
@@ -3847,12 +3934,15 @@ body.brible-active .app-main { padding: 0; max-width: none; }
 /* Misc UI */
 .app-body .chip { background: rgba(255,255,255,0.05); border-color: rgba(148,163,184,0.12); }
 .app-body .feat-toggle { background: rgba(255,255,255,0.04); border-color: rgba(148,163,184,0.12); }
+.app-body .feat-toggle-track { background: rgba(148,163,184,0.28); }
 .app-body .plan-pill { background: rgba(255,255,255,0.04); border-color: rgba(148,163,184,0.12); }
+.app-body .plan-tag { background: rgba(255,255,255,0.04); border-color: rgba(148,163,184,0.18); }
 .app-body .plan-box { border-color: rgba(148,163,184,0.12); background: rgba(255,255,255,0.03); }
 .app-body .divider { border-top-color: rgba(148,163,184,0.08); }
 .app-body .asset-opt-body { border-color: rgba(148,163,184,0.12); background: rgba(10,15,38,0.72); }
 .app-body .say-hints { background: rgba(255,255,255,0.04); border-color: rgba(148,163,184,0.12); }
 .app-body .social-item { background: rgba(255,255,255,0.04); border-color: rgba(148,163,184,0.1); }
-.app-body .access-row { border-bottom-color: rgba(148,163,184,0.08); }
+.app-body .access-card { background: rgba(255,255,255,0.03); }
+.app-body .capture-item { border-bottom-color: rgba(148,163,184,0.08); }
 .app-body .capture-item { border-bottom-color: rgba(148,163,184,0.08); }
 .app-body .page-sub { color: #94a3b8; }
