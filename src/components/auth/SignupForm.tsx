@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { callProvisionProfile } from "@/lib/edgeFunctions";
 import { getJSON, scopedKey, setJSON } from "@/lib/storage";
 import { FormAlert } from "./FormAlert";
 import { PasswordField } from "./PasswordField";
@@ -33,7 +34,7 @@ function loginUrl() {
 /* Mirrors js/auth.js's provisionFeatures(): derives a plan label from the
    selected add-ons and writes the feature-gate flags a future dashboard
    reads via useFeatureGating(), keyed exactly as "bsl_features:<email>". */
-function provisionFeatures(email: string, addons: string[]) {
+function provisionFeatures(email: string, addons: string[]): string {
   const flags: Record<string, boolean> = {};
   [...DEFAULT_FEATURE_KEYS, ...ADDON_KEYS].forEach((k) => {
     flags[k] = (DEFAULT_FEATURE_KEYS as readonly string[]).includes(k) || addons.includes(k);
@@ -47,6 +48,7 @@ function provisionFeatures(email: string, addons: string[]) {
     }
   }
   setJSON(scopedKey("bsl_features", email), { plan, features: flags });
+  return plan;
 }
 
 function passwordScore(v: string) {
@@ -104,15 +106,14 @@ export function SignupForm() {
     setAddons((prev) => (checked ? [...prev, key] : prev.filter((k) => k !== key)));
   }
 
-  async function provisionProfile() {
+  async function provisionProfile(plan: string) {
     try {
-      const { data } = await supabase.auth.getUser();
-      const user = data?.user;
-      if (!user) return;
-      await supabase.from("profiles").insert({ user_id: user.id });
+      await callProvisionProfile(supabase, plan);
     } catch {
       // best-effort backstop — getPlan() in the Edge Functions lazily
-      // creates this row on first authenticated call too
+      // creates a 'starter' row on first authenticated call too, so a
+      // failure here just means the account starts on starter instead
+      // of its chosen plan rather than being fully unprovisioned
     }
   }
 
@@ -162,10 +163,10 @@ export function SignupForm() {
       return;
     }
 
-    provisionFeatures(lowerEmail, addons);
+    const plan = provisionFeatures(lowerEmail, addons);
 
     if (data.session) {
-      await provisionProfile();
+      await provisionProfile(plan);
       setSuccess({ name, subText: null });
       setTimeout(() => router.push("/app/agent"), 1400);
     } else {

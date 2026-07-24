@@ -6,6 +6,7 @@ import { useMemory } from "@/hooks/useMemory";
 import { useCredits } from "@/hooks/useCredits";
 import { useActivityLog } from "@/hooks/useActivityLog";
 import { useToast } from "@/components/app/ToastProvider";
+import { CreditsLockedPage } from "@/components/app/CreditsLockedPage";
 import { getJSON, scopedKey, setJSON } from "@/lib/storage";
 import { spinText, type CapturedFields } from "@/lib/assetTemplates";
 import {
@@ -56,7 +57,7 @@ const SYSTEM_ICON = (
 export default function SocialStudioPage() {
   const { user } = useAuth();
   const { activeClient } = useMemory();
-  const { spendCredits } = useCredits();
+  const { spendCredits, creditsExhausted } = useCredits();
   const { logActivity } = useActivityLog();
   const toast = useToast();
 
@@ -218,6 +219,8 @@ export default function SocialStudioPage() {
 
   const queued = items.filter((p) => p.scheduled).sort((a, b) => (a.scheduled! < b.scheduled! ? -1 : 1));
   const drafts = items.filter((p) => !p.scheduled);
+
+  if (creditsExhausted) return <CreditsLockedPage feature="Social studio" />;
 
   return (
     <>

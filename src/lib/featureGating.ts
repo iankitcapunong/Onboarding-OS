@@ -5,7 +5,7 @@ import { getJSON, scopedKey, setJSON } from "./storage";
    disappears from that client's sidebar and its route falls back to the
    dashboard. Admins always keep every feature and are unmetered. */
 
-export const ADMIN_EMAILS = ["demo@gmail.com"];
+export const ADMIN_EMAILS: string[] = [];
 
 export type FeatureKey =
   | "agent"
@@ -42,13 +42,19 @@ export const PLANS: { key: Exclude<PlanKey, "custom">; label: string; features: 
 
 export const PLAN_CREDITS: Record<PlanKey, number> = { starter: 250, growth: 1000, full: 3000, custom: 1000 };
 
+// Flat rate — every generate action costs the same 50 credits,
+// regardless of feature. Mirrored server-side in each Edge Function's
+// own cost table (supabase/functions/*/index.ts) since that's the
+// actual enforcement point; this copy only drives the client's
+// optimistic pre-check and "not enough credits" messaging.
+const FLAT_COST = 50;
 export const CREDIT_COSTS: Record<string, number> = {
-  asset: 5,
-  social: 2,
-  creative: 10,
-  images: 10,
-  videos: 40,
-  brible: 50,
+  asset: FLAT_COST,
+  social: FLAT_COST,
+  creative: FLAT_COST,
+  images: FLAT_COST,
+  videos: FLAT_COST,
+  brible: FLAT_COST,
 };
 
 type StoredAccess = { plan?: PlanKey; features?: Partial<Record<FeatureKey, boolean>> } | Partial<Record<FeatureKey, boolean>> | null;

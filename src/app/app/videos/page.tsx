@@ -6,7 +6,9 @@ import { useActivityLog } from "@/hooks/useActivityLog";
 import { useCredits } from "@/hooks/useCredits";
 import { useToast } from "@/components/app/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
+import { EdgeFunctionError } from "@/lib/edgeFunctions";
 import { getJSON, scopedKey, setJSON } from "@/lib/storage";
+import { CreditsLockedPage } from "@/components/app/CreditsLockedPage";
 import { MODELS, type VideoModel } from "@/components/videos/models";
 import { POLL_MS, POLL_TIMEOUT_MS, createTask, checkTask, type VideoItem, type CheckResult } from "@/components/videos/api";
 import { GalleryCard } from "@/components/videos/GalleryCard";
@@ -57,7 +59,7 @@ function ratioBoxStyle(r: string): React.CSSProperties {
 export default function VideoStudioPage() {
   const { user } = useAuth();
   const { logActivity } = useActivityLog();
-  const { spendCredits, syncCreditsFromServer } = useCredits();
+  const { spendCredits, syncCreditsFromServer, creditsExhausted } = useCredits();
   const toast = useToast();
   const [supabase] = useState(() => createClient());
 
@@ -279,6 +281,7 @@ export default function VideoStudioPage() {
       startPolling(item);
       toast(`Video generation started · ${m.name}. This can take a few minutes.`, true);
     } catch (err) {
+      if (err instanceof EdgeFunctionError && err.code === "out_of_credits") syncCreditsFromServer(err.remaining ?? 0);
       toast(err instanceof Error ? err.message : "Could not reach the video service");
     } finally {
       setBusy(false);
@@ -287,6 +290,8 @@ export default function VideoStudioPage() {
 
   const m = sel.model;
   const showRefField = !!(m.needsRef || m.allowsRef);
+
+  if (creditsExhausted) return <CreditsLockedPage feature="Video studio" />;
 
   return (
     <>

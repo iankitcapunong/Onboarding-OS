@@ -1,6 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export class EdgeFunctionError extends Error {}
+export class EdgeFunctionError extends Error {
+  code?: string;
+  remaining?: number;
+  constructor(message: string, opts?: { code?: string; remaining?: number }) {
+    super(message);
+    this.code = opts?.code;
+    this.remaining = opts?.remaining;
+  }
+}
 
 /* Ported 1:1 from the SB.auth.getSession() + fetch(".../functions/v1/<name>")
    pattern repeated across app.js (bribleCallFn, sheetsFn) and
@@ -9,7 +17,7 @@ export class EdgeFunctionError extends Error {}
    (detail > error > "fn-<status>"). */
 async function callEdgeFunction<T = unknown>(
   supabase: SupabaseClient,
-  name: "brible" | "imagegen" | "videogen" | "sheets-log",
+  name: "brible" | "imagegen" | "videogen" | "sheets-log" | "credits" | "provision-profile",
   payload: unknown
 ): Promise<T> {
   const {
@@ -30,7 +38,10 @@ async function callEdgeFunction<T = unknown>(
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data?.error) {
-    throw new EdgeFunctionError(data?.detail || data?.error || `fn-${res.status}`);
+    throw new EdgeFunctionError(data?.detail || data?.error || `fn-${res.status}`, {
+      code: typeof data?.error === "string" ? data.error : undefined,
+      remaining: typeof data?.remaining === "number" ? data.remaining : undefined,
+    });
   }
   return data as T;
 }
@@ -59,4 +70,18 @@ export function callVideogen<T = { remaining?: number }>(
   body?: unknown
 ) {
   return callEdgeFunction<T>(supabase, "videogen", { method, path, body: body ?? null });
+}
+
+// Server-side credit metering for features with no upstream API to
+// proxy (creative ads, assets) — see supabase/functions/credits/index.ts.
+export function callCredits<T = { remaining?: number }>(supabase: SupabaseClient, kind: string, count = 1) {
+  return callEdgeFunction<T>(supabase, "credits", { kind, count });
+}
+
+// Sets the real, server-enforced plan for a brand-new account, based on
+// what the signup/trial form computed from chosen add-ons — see
+// supabase/functions/provision-profile/index.ts. Only takes effect on
+// an account's first call (subsequent calls are a no-op server-side).
+export function callProvisionProfile<T = { plan?: string }>(supabase: SupabaseClient, plan: string) {
+  return callEdgeFunction<T>(supabase, "provision-profile", { plan });
 }

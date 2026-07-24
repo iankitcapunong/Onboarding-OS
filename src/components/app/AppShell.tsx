@@ -7,6 +7,7 @@ import { SideNav } from "./SideNav";
 import { Topbar, ROUTE_TITLES } from "./Topbar";
 import { useFeatureGating } from "@/hooks/useFeatureGating";
 import { useCredits } from "@/hooks/useCredits";
+import { CreditsExhaustedModal } from "./CreditsExhaustedModal";
 
 function PlanChip() {
   const { isAdmin, planLabel } = useFeatureGating();
@@ -33,6 +34,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <a className="skip-link" href="#appMain">Skip to main content</a>
+
+      <CreditsExhaustedModal />
 
       <aside className={`sidebar${sidebarOpen ? " open" : ""}`}>
         <Link href="/" className="brand sidebar-brand" aria-label="Onboarding OS home">

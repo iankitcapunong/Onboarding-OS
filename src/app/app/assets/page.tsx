@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useAssets, type Asset } from "@/hooks/useAssets";
+import { useCredits } from "@/hooks/useCredits";
 import { useToast } from "@/components/app/ToastProvider";
 import { AssetModal } from "@/components/app/AssetModal";
 import { CreativeModal, type Creative } from "@/components/creative/CreativeModal";
+import { CreditsLockedPage } from "@/components/app/CreditsLockedPage";
 import type { AssetType } from "@/lib/assetTemplates";
 
 const ASSET_ICON: Record<string, React.ReactNode> = {
@@ -58,6 +60,7 @@ function whenLabel(a: Asset) {
 
 export default function AssetsPage() {
   const { assets, latestSessionName, generate, clearAll, generating } = useAssets();
+  const { creditsExhausted } = useCredits();
   const toast = useToast();
   const [selected, setSelected] = useState<Set<AssetType>>(
     () => new Set(OPTIONS.filter((o) => o.defaultChecked).map((o) => o.value))
@@ -82,6 +85,8 @@ export default function AssetsPage() {
     clearAll();
     toast("All assets cleared", true);
   }
+
+  if (creditsExhausted) return <CreditsLockedPage feature="Assets" />;
 
   return (
     <>

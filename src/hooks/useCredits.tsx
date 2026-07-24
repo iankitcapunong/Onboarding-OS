@@ -12,6 +12,7 @@ type CreditState = { month: string; used: number };
 type CreditsContextValue = {
   creditsLeft: number;
   creditAllowance: number;
+  creditsExhausted: boolean;
   spendCredits: (kind: string, count?: number) => boolean;
   syncCreditsFromServer: (remaining: number) => void;
 };
@@ -42,6 +43,7 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
 
   const creditAllowance = PLAN_CREDITS[planKey as PlanKey] ?? PLAN_CREDITS.custom;
   const creditsLeft = Math.max(0, creditAllowance - creditState.used);
+  const creditsExhausted = !isAdmin && creditsLeft <= 0;
 
   const spendCredits = useCallback(
     (kind: string, count = 1) => {
@@ -70,8 +72,8 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ creditsLeft, creditAllowance, spendCredits, syncCreditsFromServer }),
-    [creditsLeft, creditAllowance, spendCredits, syncCreditsFromServer]
+    () => ({ creditsLeft, creditAllowance, creditsExhausted, spendCredits, syncCreditsFromServer }),
+    [creditsLeft, creditAllowance, creditsExhausted, spendCredits, syncCreditsFromServer]
   );
 
   return <CreditsContext.Provider value={value}>{children}</CreditsContext.Provider>;

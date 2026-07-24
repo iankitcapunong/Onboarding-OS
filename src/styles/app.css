@@ -296,6 +296,24 @@
   margin: 0;
 }
 
+.credits-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 480px;
+  margin: 40px auto;
+  padding: 28px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+  text-align: left;
+}
+
+.credits-locked h2 { font-size: 20px; margin: 0; }
+
+.credits-locked p { font-size: 14.5px; color: var(--ink-3); margin: 0; }
+
 /* ---- Card entrance (restarts each time a route is unhidden) ---- */
 @keyframes rise-in {
   from { opacity: 0; transform: translateY(16px); }

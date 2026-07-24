@@ -9,6 +9,8 @@ import { useToast } from "@/components/app/ToastProvider";
 import { getJSON, scopedKey, setJSON } from "@/lib/storage";
 import { buildContent, type AssetType, type CapturedFields } from "@/lib/assetTemplates";
 import { buildWebsiteHTML, resolveCreativeCtx } from "@/lib/creativeBuilders";
+import { createClient } from "@/lib/supabase/client";
+import { callCredits, EdgeFunctionError } from "@/lib/edgeFunctions";
 
 export type Asset = {
   id: string;
@@ -65,9 +67,10 @@ const AssetsContext = createContext<AssetsContextValue | null>(null);
 export function AssetsProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const { logActivity } = useActivityLog();
-  const { spendCredits } = useCredits();
+  const { spendCredits, syncCreditsFromServer } = useCredits();
   const { activeClient } = useMemory();
   const toast = useToast();
+  const [supabase] = useState(() => createClient());
   const email = (user?.email || "").toLowerCase();
   const assetsKey = scopedKey("bsl_assets", email);
   const callKey = scopedKey("bsl_last_call", email);
@@ -99,6 +102,21 @@ export function AssetsProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       if (!spendCredits("asset", types.length)) return;
+
+      // spendCredits() above is just an optimistic local gate for instant
+      // UI feedback; this call is the real, server-enforced spend (asset
+      // generation itself is client-side templating with no upstream API
+      // to proxy, so this is the only thing standing between a user and
+      // editing bsl_credits in devtools for unlimited generates).
+      try {
+        const out = await callCredits(supabase, "asset", types.length);
+        if (typeof out.remaining === "number") syncCreditsFromServer(out.remaining);
+      } catch (err) {
+        if (err instanceof EdgeFunctionError && err.code === "out_of_credits") syncCreditsFromServer(err.remaining ?? 0);
+        const message = err instanceof Error ? err.message : "";
+        toast(message === "not-signed-in" ? "You need to be signed in to generate assets" : message || "Couldn't verify credits — try again in a moment.");
+        return;
+      }
 
       const live = latestCallContext();
       const mem = !live ? activeClient : null;
@@ -152,7 +170,7 @@ export function AssetsProvider({ children }: { children: React.ReactNode }) {
       logActivity("asset", `Generated ${types.join(", ")}${ctx ? " from call capture" : ""}`);
       toast(`${types.length} asset${types.length > 1 ? "s" : ""} generated${ctx ? " from your call capture" : ""}`, true);
     },
-    [assetsKey, activeClient, spendCredits, logActivity, toast, latestCallContext]
+    [assetsKey, activeClient, spendCredits, syncCreditsFromServer, supabase, logActivity, toast, latestCallContext]
   );
 
   const clearAll = useCallback(() => {

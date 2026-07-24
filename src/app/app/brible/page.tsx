@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useBrible } from "@/hooks/useBrible";
+import { useCredits } from "@/hooks/useCredits";
 import { BribleHome } from "@/components/brible/BribleHome";
 import { BribleBuilder } from "@/components/brible/BribleBuilder";
+import { CreditsLockedPage } from "@/components/app/CreditsLockedPage";
 
 /* Direct replacement for app.html's #route-brible + js/app.js's home
    ⇄ builder view toggle (bribleShowHome()/bribleShowBuilder(), lines
@@ -18,14 +20,18 @@ import { BribleBuilder } from "@/components/brible/BribleBuilder";
    src/styles/app.css). */
 export default function BriblePage() {
   const { versions } = useBrible();
+  const { creditsExhausted } = useCredits();
   const [view, setView] = useState<"home" | "builder">(() => (versions.length ? "builder" : "home"));
 
   useEffect(() => {
+    if (creditsExhausted) return;
     document.body.classList.add("brible-active");
     return () => {
       document.body.classList.remove("brible-active");
     };
-  }, []);
+  }, [creditsExhausted]);
+
+  if (creditsExhausted) return <CreditsLockedPage feature="Brible websites" />;
 
   return (
     <div className="brible-shell">

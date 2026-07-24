@@ -11,7 +11,8 @@ import { useActivityLog } from "@/hooks/useActivityLog";
 import { useCredits } from "@/hooks/useCredits";
 import { useToast } from "@/components/app/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
-import { callImagegen } from "@/lib/edgeFunctions";
+import { callImagegen, EdgeFunctionError } from "@/lib/edgeFunctions";
+import { CreditsLockedPage } from "@/components/app/CreditsLockedPage";
 import { getJSON, scopedKey, setJSON } from "@/lib/storage";
 
 /* ============================================================
@@ -448,7 +449,7 @@ function GalleryCard({
 export default function ImageStudioPage() {
   const { user } = useAuth();
   const { logActivity } = useActivityLog();
-  const { spendCredits, syncCreditsFromServer } = useCredits();
+  const { spendCredits, syncCreditsFromServer, creditsExhausted } = useCredits();
   const toast = useToast();
   const [supabase] = useState(() => createClient());
 
@@ -683,6 +684,7 @@ export default function ImageStudioPage() {
       startPolling(item);
       toast(`Generation started · ${m.name}`, true);
     } catch (err) {
+      if (err instanceof EdgeFunctionError && err.code === "out_of_credits") syncCreditsFromServer(err.remaining ?? 0);
       toast(err instanceof Error && err.message ? err.message : "Could not reach the image service");
     } finally {
       setBusy(false);
@@ -690,6 +692,8 @@ export default function ImageStudioPage() {
   }
 
   const showRefField = Boolean(model.needsRef || model.allowsRef);
+
+  if (creditsExhausted) return <CreditsLockedPage feature="Image studio" />;
 
   return (
     <>

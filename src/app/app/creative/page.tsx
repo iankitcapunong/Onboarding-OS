@@ -7,11 +7,14 @@ import { useMemory } from "@/hooks/useMemory";
 import { useCredits } from "@/hooks/useCredits";
 import { useActivityLog } from "@/hooks/useActivityLog";
 import { useToast } from "@/components/app/ToastProvider";
+import { createClient } from "@/lib/supabase/client";
+import { callCredits, EdgeFunctionError } from "@/lib/edgeFunctions";
 import { getJSON, scopedKey, setJSON } from "@/lib/storage";
 import { CREATIVE_KINDS, DEMO_CTX, resolveCreativeCtx, type CreativeFields, type CreativeKind } from "@/lib/creativeBuilders";
 import type { CapturedFields } from "@/lib/assetTemplates";
 import { CreativeIcon } from "@/components/creative/CreativeIcon";
 import { CreativeModal, type Creative } from "@/components/creative/CreativeModal";
+import { CreditsLockedPage } from "@/components/app/CreditsLockedPage";
 
 /* Direct replacement for js/app.js's CREATIVE ADS section (app.html's
    #route-creative + lines 2768-3857 of js/app.js): four generate buttons
@@ -50,9 +53,10 @@ function whenLabel(cr: Creative) {
 export default function CreativeAdsPage() {
   const { user } = useAuth();
   const { activeClient } = useMemory();
-  const { spendCredits } = useCredits();
+  const { spendCredits, syncCreditsFromServer, creditsExhausted } = useCredits();
   const { logActivity } = useActivityLog();
   const toast = useToast();
+  const [supabase] = useState(() => createClient());
   const email = (user?.email || "").toLowerCase();
   const creativesKey = scopedKey("bsl_creatives", email);
   const callKey = scopedKey("bsl_last_call", email);
@@ -82,6 +86,22 @@ export default function CreativeAdsPage() {
   const handleGenerate = useCallback(
     async (kind: CreativeKind) => {
       if (!spendCredits("creative", 1)) return;
+
+      // spendCredits() above is just an optimistic local gate for instant
+      // UI feedback; this call is the real, server-enforced spend
+      // (creative generation is client-side templating with no upstream
+      // API to proxy, so this is the only thing standing between a user
+      // and editing bsl_credits in devtools for unlimited generates).
+      try {
+        const out = await callCredits(supabase, "creative", 1);
+        if (typeof out.remaining === "number") syncCreditsFromServer(out.remaining);
+      } catch (err) {
+        if (err instanceof EdgeFunctionError && err.code === "out_of_credits") syncCreditsFromServer(err.remaining ?? 0);
+        const message = err instanceof Error ? err.message : "";
+        toast(message === "not-signed-in" ? "You need to be signed in to generate creatives" : message || "Couldn't verify credits — try again in a moment.");
+        return;
+      }
+
       const liveNow = latestCallContext();
       const ctx = resolveCreativeCtx(liveNow, activeClient);
 
@@ -116,7 +136,7 @@ export default function CreativeAdsPage() {
       toast(`${kindDef.label} generated in the “${out.theme}” style${ctx._fromCall ? " from your call capture" : ""}`, true);
       setOpenCreative(cr);
     },
-    [spendCredits, latestCallContext, activeClient, creativesKey, logActivity, toast]
+    [spendCredits, syncCreditsFromServer, supabase, latestCallContext, activeClient, creativesKey, logActivity, toast]
   );
 
   function handleClear() {
@@ -136,6 +156,8 @@ export default function CreativeAdsPage() {
     : memForChips
       ? `From memory · ${memForChips.business} (remembered client)`
       : "No call captured yet. Demo details are used until you run an onboarding call.";
+
+  if (creditsExhausted) return <CreditsLockedPage feature="Creative ads" />;
 
   return (
     <>

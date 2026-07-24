@@ -8,7 +8,7 @@ import { useMemory } from "./useMemory";
 import { useToast } from "@/components/app/ToastProvider";
 import { getJSON, scopedKey, setJSON } from "@/lib/storage";
 import { createClient } from "@/lib/supabase/client";
-import { callBrible, callImagegen } from "@/lib/edgeFunctions";
+import { callBrible, callImagegen, EdgeFunctionError } from "@/lib/edgeFunctions";
 import { buildWebsiteHTML, resolveCreativeCtx, type CreativeCtx, type CreativeFields } from "@/lib/creativeBuilders";
 import type { CapturedFields } from "@/lib/assetTemplates";
 import type { Asset } from "./useAssets";
@@ -613,7 +613,8 @@ export function BribleProvider({ children }: { children: React.ReactNode }) {
         try {
           const url = await genBribleImage(supabase, syncCreditsFromServer, slot.prompt, { ratio: "16:9", res: "1K" });
           return { id: slot.id, url };
-        } catch {
+        } catch (err) {
+          if (err instanceof EdgeFunctionError && err.code === "out_of_credits") syncCreditsFromServer(err.remaining ?? 0);
           return null;
         }
       });
@@ -722,7 +723,8 @@ export function BribleProvider({ children }: { children: React.ReactNode }) {
             pushVersionAction(trimmed, out);
             addMessage("bot", `Done. Updated this page. Saved as v${stateRef.current.versions.length}.`);
           }
-        } catch {
+        } catch (err) {
+          if (err instanceof EdgeFunctionError && err.code === "out_of_credits") syncCreditsFromServer(err.remaining ?? 0);
           localFallback(trimmed, c, firstBuild, true);
         }
       } finally {

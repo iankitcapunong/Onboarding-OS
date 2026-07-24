@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { callProvisionProfile } from "@/lib/edgeFunctions";
 import { scopedKey, setJSON } from "@/lib/storage";
 import { FormAlert } from "./FormAlert";
 import { PasswordField } from "./PasswordField";
@@ -129,9 +130,10 @@ export function TrialForm() {
 
     if (data.session) {
       try {
-        await supabase.from("profiles").insert({ user_id: user!.id });
+        await callProvisionProfile(supabase, "full");
       } catch {
-        // best-effort backstop, same as the paid signup flow
+        // best-effort backstop, same as the paid signup flow — getPlan()
+        // lazily creates a 'starter' row on first authenticated call
       }
       setSuccess({ name, subText: null });
       setTimeout(() => router.push("/app/agent"), 1400);
