@@ -12,6 +12,22 @@ const PRODUCTION_BROWSER_SOURCE_MAPS = false;
 // at different projects without editing this file.
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
+// The only third-party <script> this app loads (src/components/site/AgentWidget.tsx)
+// is the LeadConnector chat widget — but its own runtime pulls in several
+// more of its subdomains (services.* for its session/config API, stcdn.*
+// for phone-input libraries) plus msgsndr.com (GoHighLevel's backend infra
+// — a session-attribution call). Wildcarding each vendor's subdomains is
+// simpler and more robust than enumerating them, since it's a black-box
+// widget that may add more without notice.
+//
+// These were removed in 8faf662 when the previous voice widget was pulled,
+// and are restored here for the chat widget. Without them the loader is
+// blocked by CSP and fails silently — which is indistinguishable from the
+// widget itself being broken, so don't debug the widget before checking
+// devtools for CSP violations.
+const LEADCONNECTOR_ORIGIN = "https://*.leadconnectorhq.com";
+const MSGSNDR_ORIGIN = "https://*.msgsndr.com";
+
 // A third-party font CDN (fonts.bunny.net) — confirmed live by loading
 // the page under this CSP and watching devtools for violations.
 const BUNNY_FONTS_ORIGIN = "https://fonts.bunny.net";
@@ -39,12 +55,12 @@ const CSP_DIRECTIVES = [
   // the inline BRIBLE_EDIT_JS script injected into the AI site preview's
   // srcDoc iframe without separate special-casing. See node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md's
   // own "Without Nonces" section for this exact trade-off.
-  `script-src 'self' 'unsafe-inline'${IS_DEV ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline' ${LEADCONNECTOR_ORIGIN}${IS_DEV ? " 'unsafe-eval'" : ""}`,
   `style-src 'self' 'unsafe-inline' ${BUNNY_FONTS_ORIGIN}`,
   `img-src 'self' blob: data: https:`,
   `media-src 'self' blob: https:`,
   `font-src 'self' ${BUNNY_FONTS_ORIGIN}`,
-  `connect-src 'self' ${SUPABASE_URL}`,
+  `connect-src 'self' ${SUPABASE_URL} ${LEADCONNECTOR_ORIGIN} ${MSGSNDR_ORIGIN}`,
   `object-src 'none'`,
   `base-uri 'self'`,
   `form-action 'self'`,

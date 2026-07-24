@@ -1,6 +1,7 @@
 "use client";
 
 import { CAPS, ONB_LABELS, fmtTime, useCallCapture } from "@/hooks/useCallCapture";
+import { AgentWidget } from "@/components/site/AgentWidget";
 
 export default function AgentPage() {
   const { call, capturing, status, flashing, startCapture, stopCapture } = useCallCapture();
@@ -21,9 +22,12 @@ export default function AgentPage() {
       {/* Voice onboarding */}
       <div className="voice-panel">
         <span className="voice-eyebrow">Voice onboarding</span>
-        <h3>Capture your onboarding call</h3>
-        <p className="voice-sub">Click below to start capturing your call&apos;s transcript — details auto-fill in the summary on the left as you talk.</p>
+        <h3>Talk to your AI onboarding specialist</h3>
+        <p className="voice-sub">Start a conversation with the agent below. Turn on transcript capture and your details auto-fill in the summary on the left as you talk.</p>
         <div className="voice-box">
+          <div className="voice-widget-slot">
+            <AgentWidget />
+          </div>
           <div className="capture-bar">
             <button type="button" className={`btn btn-secondary btn-sm${capturing ? " recording" : ""}`} id="captureBtn" onClick={handleCaptureClick}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
