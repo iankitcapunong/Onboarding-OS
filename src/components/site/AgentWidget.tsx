@@ -23,7 +23,7 @@ import { useEffect, useRef } from "react";
 
 const LOADER_SRC = "https://widgets.leadconnectorhq.com/loader.js";
 const RESOURCES_URL = "https://widgets.leadconnectorhq.com/chat-widget/loader.js";
-const WIDGET_ID = "6a0dafc75589daf0dd8d9489";
+const WIDGET_ID = "6a638470b92307bb1e33ca1c";
 
 export function AgentWidget() {
   const containerRef = useRef<HTMLDivElement>(null);
