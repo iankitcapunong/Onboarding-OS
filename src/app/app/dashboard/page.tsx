@@ -1,29 +1,26 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
+import { useCallCapture } from "@/hooks/useCallCapture";
+import { useAssets } from "@/hooks/useAssets";
 import { Sparkline } from "@/components/dashboard/Sparkline";
 import { SessionsChart } from "@/components/dashboard/SessionsChart";
 import { FunnelChart } from "@/components/dashboard/FunnelChart";
 import { RecentSessionsTable } from "@/components/dashboard/RecentSessionsTable";
-
-const SPARK_DATA = {
-  spark1: [3, 4, 4, 5, 4, 6, 5, 7, 6, 8, 7, 9],
-  spark2: [78, 80, 79, 82, 81, 84, 83, 85, 84, 86, 85, 86],
-  spark3: [14, 18, 16, 20, 22, 21, 25, 24, 27, 28, 30, 33],
-  spark4: [40, 44, 48, 50, 55, 58, 60, 63, 66, 70, 72, 76],
-};
-
-const TILES = [
-  { label: "Onboarding sessions", value: "128", delta: "▲ 18% vs last month", up: true, data: SPARK_DATA.spark1 },
-  { label: "Completion rate", value: "86%", delta: "▲ 4 pts vs last month", up: true, data: SPARK_DATA.spark2 },
-  { label: "Assets generated", value: "312", delta: "▲ 22% vs last month", up: true, data: SPARK_DATA.spark3 },
-  { label: "Time saved", value: "768 hrs", delta: "≈ 6 hrs per session", up: false, data: SPARK_DATA.spark4 },
-];
+import { computeFunnel, computeRecentSessions, computeTiles, sessionsSeries } from "@/lib/dashboardStats";
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { logs } = useCallCapture();
+  const { assets } = useAssets();
   const firstName = ((user?.user_metadata?.name as string | undefined) || "there").split(" ")[0];
+
+  const tiles = useMemo(() => computeTiles(logs, assets), [logs, assets]);
+  const chartData = useMemo(() => sessionsSeries(logs), [logs]);
+  const funnelStages = useMemo(() => computeFunnel(logs, assets), [logs, assets]);
+  const sessionRows = useMemo(() => computeRecentSessions(logs, assets), [logs, assets]);
 
   return (
     <>
@@ -42,7 +39,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="tiles">
-        {TILES.map((t) => (
+        {tiles.map((t) => (
           <div className="tile" key={t.label}>
             <span className="tile-label">{t.label}</span>
             <span className="tile-value">{t.value}</span>
@@ -60,17 +57,17 @@ export default function DashboardPage() {
               <p className="panel-sub">Last 30 days</p>
             </div>
           </div>
-          <SessionsChart />
+          <SessionsChart data={chartData} />
         </div>
 
         <div className="panel">
           <div className="panel-head">
             <div>
               <h3>Session funnel</h3>
-              <p className="panel-sub">Last 30 days</p>
+              <p className="panel-sub">All time</p>
             </div>
           </div>
-          <FunnelChart />
+          <FunnelChart stages={funnelStages} />
         </div>
       </div>
 
@@ -82,7 +79,7 @@ export default function DashboardPage() {
           </div>
           <Link href="/app/agent" className="btn btn-secondary btn-sm">Open onboarding</Link>
         </div>
-        <RecentSessionsTable />
+        <RecentSessionsTable sessions={sessionRows} />
       </div>
     </>
   );

@@ -1,30 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-/* 30 days of sessions, gentle upward trend — demo data, matching the
-   original's "Demo data, no backend" dashboard. */
-const VALUES = [2, 3, 2, 4, 3, 3, 5, 4, 4, 5, 6, 4, 5, 6, 5, 7, 6, 5, 7, 8, 6, 7, 8, 7, 9, 8, 7, 9, 8, 9];
-
-function buildData() {
-  const today = new Date();
-  return VALUES.map((value, i) => {
-    const d = new Date(today);
-    d.setDate(today.getDate() - (VALUES.length - 1 - i));
-    return { date: d, value };
-  });
-}
+export type SessionsChartPoint = { date: Date; value: number };
 
 function fmtDate(d: Date) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-export function SessionsChart() {
+export function SessionsChart({ data }: { data: SessionsChartPoint[] }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [width, setWidth] = useState(0);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
-  const data = useMemo(() => buildData(), []);
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -41,8 +29,10 @@ export function SessionsChart() {
   const m = { top: 16, right: 46, bottom: 30, left: 34 };
   const iw = width - m.left - m.right;
   const ih = H - m.top - m.bottom;
-  const yMax = 10;
   const n = data.length;
+  const rawMax = Math.max(...data.map((d) => d.value), 0);
+  const yMax = Math.max(10, Math.ceil((rawMax + 1) / 5) * 5);
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(yMax * f));
 
   const x = (i: number) => m.left + (i / (n - 1)) * iw;
   const y = (v: number) => m.top + ih - (v / yMax) * ih;
@@ -72,7 +62,7 @@ export function SessionsChart() {
           ref={svgRef}
           id="sessionsChart"
           role="img"
-          aria-label="Line chart of onboarding sessions per day over the last 30 days, trending upward from 2 to 9 sessions per day."
+          aria-label={`Line chart of onboarding sessions captured per day over the last 30 days, ending at ${last.value} session${last.value !== 1 ? "s" : ""} today.`}
           viewBox={`0 0 ${width} ${H}`}
           width={width}
           height={H}
@@ -82,7 +72,7 @@ export function SessionsChart() {
           onMouseLeave={() => setHoverIdx(null)}
           onTouchEnd={() => setHoverIdx(null)}
         >
-          {[0, 2, 4, 6, 8, 10].map((t) => (
+          {yTicks.map((t) => (
             <g key={t}>
               <line x1={m.left} y1={y(t)} x2={width - m.right} y2={y(t)} stroke="#eef2f6" strokeWidth={1} />
               <text x={m.left - 9} y={y(t) + 4} textAnchor="end" fontSize={11} fill="#94a3b8" fontFamily="Inter, sans-serif">

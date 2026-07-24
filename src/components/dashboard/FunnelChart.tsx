@@ -1,14 +1,10 @@
-const FUNNEL = [
-  { label: "Sessions started", value: 128, color: "#3730a3" },
-  { label: "Interview completed", value: 110, color: "#4f46e5" },
-  { label: "Assets generated", value: 96, color: "#818cf8" },
-];
+import type { FunnelStage } from "@/lib/dashboardStats";
 
-export function FunnelChart() {
-  const max = FUNNEL[0].value;
+export function FunnelChart({ stages }: { stages: FunnelStage[] }) {
+  const max = stages[0]?.value || 1;
   return (
     <div id="funnel">
-      {FUNNEL.map((s) => {
+      {stages.map((s) => {
         const pct = Math.round((s.value / max) * 100);
         return (
           <div className="funnel-row" key={s.label}>
