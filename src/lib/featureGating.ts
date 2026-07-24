@@ -42,19 +42,25 @@ export const PLANS: { key: Exclude<PlanKey, "custom">; label: string; features: 
 
 export const PLAN_CREDITS: Record<PlanKey, number> = { starter: 250, growth: 1000, full: 3000, custom: 1000 };
 
-// Flat rate — every generate action costs the same 50 credits,
-// regardless of feature. Mirrored server-side in each Edge Function's
-// own cost table (supabase/functions/*/index.ts) since that's the
-// actual enforcement point; this copy only drives the client's
-// optimistic pre-check and "not enough credits" messaging.
-const FLAT_COST = 50;
+// Two-tier pricing: features that call a real, costly upstream API
+// (video generation, brible's multi-call LLM pipeline) charge 50;
+// everything else charges 10. Mirrored server-side in each Edge
+// Function's own cost table (supabase/functions/*/index.ts — imagegen's
+// FLAT_COST, credits/index.ts's KIND_COST, videogen's FLAT_COST,
+// brible's MODE_COST) since that's the actual enforcement point; this
+// copy only drives the client's optimistic pre-check and "not enough
+// credits" messaging. Keep these numbers in sync by hand — there's no
+// shared source between the two repos, and a mismatch is exactly what
+// causes the client and server credit counts to drift apart.
+const LOW_COST = 10;
+const HIGH_COST = 50;
 export const CREDIT_COSTS: Record<string, number> = {
-  asset: FLAT_COST,
-  social: FLAT_COST,
-  creative: FLAT_COST,
-  images: FLAT_COST,
-  videos: FLAT_COST,
-  brible: FLAT_COST,
+  asset: LOW_COST,
+  social: LOW_COST,
+  creative: LOW_COST,
+  images: LOW_COST,
+  videos: HIGH_COST,
+  brible: HIGH_COST,
 };
 
 type StoredAccess = { plan?: PlanKey; features?: Partial<Record<FeatureKey, boolean>> } | Partial<Record<FeatureKey, boolean>> | null;
