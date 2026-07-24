@@ -28,16 +28,6 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const LEADCONNECTOR_ORIGIN = "https://*.leadconnectorhq.com";
 const MSGSNDR_ORIGIN = "https://*.msgsndr.com";
 
-// GHL's Conversation AI voice feature routes actual call audio through
-// Retell AI over LiveKit Cloud (observed live: wss://retell-ai-<id>.livekit.cloud
-// for RTC signaling, https://<same host>/settings/regions and /rtc/v1/validate
-// for setup). Without this, connect-src blocks every one of those requests —
-// the widget loads and the click "works" (mic prompt fires), but the call
-// itself can never connect. Wildcarded since the per-project subdomain isn't
-// fixed or discoverable from source.
-const LIVEKIT_WS_ORIGIN = "wss://*.livekit.cloud";
-const LIVEKIT_HTTPS_ORIGIN = "https://*.livekit.cloud";
-
 // A third-party font CDN (fonts.bunny.net) — confirmed live by loading
 // the page under this CSP and watching devtools for violations.
 const BUNNY_FONTS_ORIGIN = "https://fonts.bunny.net";
@@ -70,7 +60,7 @@ const CSP_DIRECTIVES = [
   `img-src 'self' blob: data: https:`,
   `media-src 'self' blob: https:`,
   `font-src 'self' ${BUNNY_FONTS_ORIGIN}`,
-  `connect-src 'self' ${SUPABASE_URL} ${LEADCONNECTOR_ORIGIN} ${MSGSNDR_ORIGIN} ${LIVEKIT_WS_ORIGIN} ${LIVEKIT_HTTPS_ORIGIN}`,
+  `connect-src 'self' ${SUPABASE_URL} ${LEADCONNECTOR_ORIGIN} ${MSGSNDR_ORIGIN}`,
   `object-src 'none'`,
   `base-uri 'self'`,
   `form-action 'self'`,
