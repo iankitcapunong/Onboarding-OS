@@ -23,6 +23,19 @@ function thisMonth() {
   return new Date().toISOString().slice(0, 7);
 }
 
+// Merges the freshest persisted usage with in-memory state, taking
+// whichever recorded more spending this month. Reading localStorage
+// fresh (rather than trusting a possibly-stale `creditState` closure)
+// and taking the max, rather than just overwriting, is what stops
+// concurrent writers — another tab, or two spends racing within this
+// one — from reverting `used` backward and handing back credits that
+// were already spent.
+function reconcileUsed(stored: CreditState | null, prev: CreditState): CreditState {
+  const prevUsed = prev.month === thisMonth() ? prev.used : 0;
+  const storedUsed = stored && stored.month === thisMonth() ? stored.used : 0;
+  return { month: thisMonth(), used: Math.max(prevUsed, storedUsed) };
+}
+
 /* Direct replacement for js/app.js's CREDITS section (spendCredits(),
    creditsLeft(), syncCreditsFromServer()/window.bslSyncCredits — the
    Edge Functions are the real source of truth; this reconciles the
@@ -47,7 +60,7 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
     if (!email || hydratedForRef.current === email) return;
     hydratedForRef.current = email;
     const stored = getJSON<CreditState>(creditsKey);
-    setCreditState(stored && stored.month === thisMonth() ? stored : { month: thisMonth(), used: 0 });
+    setCreditState((prev) => reconcileUsed(stored, prev));
   }, [email, creditsKey]);
 
   const creditAllowance = PLAN_CREDITS[planKey as PlanKey] ?? PLAN_CREDITS.custom;
@@ -62,22 +75,28 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
         toast(`Not enough credits — this needs ${cost} and you have ${creditsLeft}. Credits reset next month, or upgrade your plan.`);
         return false;
       }
-      const next = { ...creditState, used: creditState.used + cost };
-      setCreditState(next);
-      setJSON(creditsKey, next);
+      setCreditState((prev) => {
+        const merged = reconcileUsed(getJSON<CreditState>(creditsKey), prev);
+        const next = { ...merged, used: merged.used + cost };
+        setJSON(creditsKey, next);
+        return next;
+      });
       return true;
     },
-    [isAdmin, creditsLeft, creditState, creditsKey, toast]
+    [isAdmin, creditsLeft, creditsKey, toast]
   );
 
+  // The Edge Function's response is authoritative (it already accounts
+  // for every writer — every tab, every device), so unlike spendCredits
+  // this intentionally overwrites rather than merging.
   const syncCreditsFromServer = useCallback(
     (remaining: number) => {
       if (isAdmin || typeof remaining !== "number") return;
-      const next = { ...creditState, used: Math.max(0, creditAllowance - remaining) };
+      const next = { month: thisMonth(), used: Math.max(0, creditAllowance - remaining) };
       setCreditState(next);
       setJSON(creditsKey, next);
     },
-    [isAdmin, creditState, creditAllowance, creditsKey]
+    [isAdmin, creditAllowance, creditsKey]
   );
 
   const value = useMemo(
