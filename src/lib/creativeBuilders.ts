@@ -38,8 +38,7 @@ export const DEMO_CTX: CreativeFields = {
 /* ctx resolution: a live call capture takes priority over active client
    memory, per field, falling back to DEMO_CTX — matching the original's
    creativeCtx(). The caller resolves which raw sources to pass in
-   (getJSON(bsl_last_call) vs useMemory()'s activeClient), same priority
-   as socialCtx() in the Social Studio feature. */
+   (getJSON(bsl_last_call) vs useMemory()'s activeClient). */
 export function resolveCreativeCtx(
   live: CapturedFields | null | undefined,
   mem: CapturedFields | null | undefined

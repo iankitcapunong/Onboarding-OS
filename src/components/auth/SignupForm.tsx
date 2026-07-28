@@ -15,7 +15,7 @@ type Order = {
   amount: number;
 };
 
-const ADDON_KEYS = ["social", "brible", "creative", "images", "videos"] as const;
+const ADDON_KEYS = ["brible", "creative", "images", "videos"] as const;
 const DEFAULT_FEATURE_KEYS = ["agent", "playground", "calls", "onboarding", "assets"] as const;
 const PLAN_FEATURES: Record<string, readonly string[]> = {
   starter: ["agent", "calls", "assets"],

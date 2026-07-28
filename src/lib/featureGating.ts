@@ -17,7 +17,6 @@ export type FeatureKey =
   | "calls"
   | "onboarding"
   | "assets"
-  | "social"
   | "brible"
   | "creative"
   | "images"
@@ -29,7 +28,6 @@ export const FEATURES: { key: FeatureKey; label: string }[] = [
   { key: "calls", label: "Call logs" },
   { key: "onboarding", label: "Onboarding logs" },
   { key: "assets", label: "Assets" },
-  { key: "social", label: "Social studio" },
   { key: "brible", label: "Brible websites" },
   { key: "creative", label: "Creative ads" },
   { key: "images", label: "Image studio" },
@@ -60,7 +58,6 @@ const LOW_COST = 10;
 const HIGH_COST = 50;
 export const CREDIT_COSTS: Record<string, number> = {
   asset: LOW_COST,
-  social: LOW_COST,
   creative: LOW_COST,
   images: LOW_COST,
   videos: HIGH_COST,
