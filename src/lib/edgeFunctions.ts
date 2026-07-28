@@ -51,6 +51,36 @@ export function callSheetsLog<T = unknown>(supabase: SupabaseClient, sheet: stri
   return callEdgeFunction<T>(supabase, "sheets-log", { sheet });
 }
 
+// Powers the public "/talk/<slug>" page — there is no signed-in visitor
+// and no Supabase session to attach, unlike every other function above.
+// Auth is the anon key alone; agent-talk/index.ts (verify_jwt = false)
+// resolves who's actually talking from the slug itself and meters usage
+// against that deployment's owner, not the caller.
+export async function callAgentTalk<T = { reply: string }>(payload: {
+  slug: string;
+  message: string;
+  history: { role: "user" | "assistant"; content: string }[];
+}): Promise<T> {
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/agent-talk`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${anonKey}`,
+      apikey: anonKey,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data?.error) {
+    throw new EdgeFunctionError(data?.detail || data?.error || `fn-${res.status}`, {
+      code: typeof data?.error === "string" ? data.error : undefined,
+    });
+  }
+  return data as T;
+}
+
 export function callBrible<T = { remaining?: number }>(supabase: SupabaseClient, payload: unknown) {
   return callEdgeFunction<T>(supabase, "brible", payload);
 }

@@ -8,6 +8,7 @@ const ROUTE_TITLES: Record<string, string> = {
   dashboard: "Dashboard",
   agent: "Onboarding flow",
   playground: "Playground",
+  deploy: "Deploy",
   calls: "Call logs",
   onboarding: "Onboarding logs",
   assets: "Assets",

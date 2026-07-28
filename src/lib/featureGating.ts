@@ -14,6 +14,7 @@ export const ADMIN_EMAILS: string[] = ["bryansumait.contact@gmail.com"];
 export type FeatureKey =
   | "agent"
   | "playground"
+  | "deploy"
   | "calls"
   | "onboarding"
   | "assets"
@@ -25,6 +26,7 @@ export type FeatureKey =
 export const FEATURES: { key: FeatureKey; label: string }[] = [
   { key: "agent", label: "Onboarding agent" },
   { key: "playground", label: "Prompt playground" },
+  { key: "deploy", label: "Deploy" },
   { key: "calls", label: "Call logs" },
   { key: "onboarding", label: "Onboarding logs" },
   { key: "assets", label: "Assets" },
@@ -37,8 +39,8 @@ export const FEATURES: { key: FeatureKey; label: string }[] = [
 export type PlanKey = "starter" | "growth" | "full" | "custom";
 
 export const PLANS: { key: Exclude<PlanKey, "custom">; label: string; features: FeatureKey[] }[] = [
-  { key: "starter", label: "Starter", features: ["agent", "calls", "assets"] },
-  { key: "growth", label: "Growth", features: ["agent", "calls", "assets", "playground", "brible", "creative"] },
+  { key: "starter", label: "Starter", features: ["agent", "deploy", "calls", "assets"] },
+  { key: "growth", label: "Growth", features: ["agent", "deploy", "calls", "assets", "playground", "brible", "creative"] },
   { key: "full", label: "Full access", features: FEATURES.map((f) => f.key) },
 ];
 
