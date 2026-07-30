@@ -97,9 +97,8 @@ export function BgGlobe() {
     const container = containerRef.current;
     if (!container) return;
 
-    const prefersReducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
+    const reduceMq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let reduced = reduceMq.matches;
 
     let renderer: THREE.WebGLRenderer;
     try {
@@ -126,7 +125,12 @@ export function BgGlobe() {
     const systemsGroup = new THREE.Group();
     scene.add(systemsGroup);
 
-    const geometry = new THREE.IcosahedronGeometry(5.0, 30);
+    // Mobile GPUs choke on the full-detail point cloud (a common cause of
+    // context loss → permanently frozen frame); halve the subdivision.
+    const geometry = new THREE.IcosahedronGeometry(
+      5.0,
+      window.innerWidth < 640 ? 16 : 30
+    );
 
     const uniforms = {
       uTime: { value: 0 },
@@ -193,25 +197,51 @@ export function BgGlobe() {
       renderer.render(scene, camera);
     }
 
-    if (prefersReducedMotion) {
-      renderer.render(scene, camera); // single static frame, no ongoing animation
-    } else {
+    function startMotion() {
       document.addEventListener("mousemove", onMouseMove);
       window.addEventListener("scroll", onScroll);
-      frame();
+      if (!rafId) frame();
     }
+
+    function stopMotion() {
+      document.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("scroll", onScroll);
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    }
+
+    if (reduced) {
+      renderer.render(scene, camera); // single static frame, no ongoing animation
+    } else {
+      startMotion();
+    }
+
+    // Live listener — toggling the OS "reduce motion" setting takes
+    // effect without a reload (previously read once at mount).
+    function onReduceChange() {
+      reduced = reduceMq.matches;
+      if (reduced) {
+        stopMotion();
+        renderer.render(scene, camera);
+      } else {
+        startMotion();
+      }
+    }
+    reduceMq.addEventListener("change", onReduceChange);
 
     function onResize() {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
       adjustLayout();
-      if (prefersReducedMotion) renderer.render(scene, camera);
+      if (reduced) renderer.render(scene, camera);
     }
     window.addEventListener("resize", onResize);
 
     function onVisibilityChange() {
-      if (prefersReducedMotion) return;
+      if (reduced) return;
       if (document.hidden) {
         if (rafId) {
           cancelAnimationFrame(rafId);
@@ -223,12 +253,21 @@ export function BgGlobe() {
     }
     document.addEventListener("visibilitychange", onVisibilityChange);
 
+    // A lost WebGL context leaves the last frame frozen on screen with no
+    // recovery — tear the canvas down instead so the CSS backdrop shows.
+    function onContextLost(e: Event) {
+      e.preventDefault();
+      stopMotion();
+      renderer.domElement.remove();
+    }
+    renderer.domElement.addEventListener("webglcontextlost", onContextLost);
+
     return () => {
-      if (rafId) cancelAnimationFrame(rafId);
-      document.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("scroll", onScroll);
+      stopMotion();
+      reduceMq.removeEventListener("change", onReduceChange);
       window.removeEventListener("resize", onResize);
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      renderer.domElement.removeEventListener("webglcontextlost", onContextLost);
       renderer.dispose();
       geometry.dispose();
       material.dispose();

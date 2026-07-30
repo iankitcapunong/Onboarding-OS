@@ -548,8 +548,10 @@ select:focus-visible {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(11, 17, 32, 0.55);
-  backdrop-filter: blur(4px);
+  /* Dim hard enough that the dialog stays readable even over a playing
+     video (client feedback: popup text washed out against the VSL). */
+  background: rgba(8, 10, 20, 0.78);
+  backdrop-filter: blur(6px);
   z-index: var(--z-modal);
   display: none;
   align-items: center;
@@ -561,6 +563,7 @@ select:focus-visible {
 
 .modal {
   background: var(--surface);
+  border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.16));
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-lg);
   width: 100%;

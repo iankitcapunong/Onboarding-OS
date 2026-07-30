@@ -81,6 +81,35 @@ export async function callAgentTalk<T = { reply: string }>(payload: {
   return data as T;
 }
 
+// Public like agent-talk: the VSL lead modal runs for anonymous visitors
+// on the marketing page, so there is no session to attach — anon key
+// alone. lead-capture/index.ts (verify_jwt = false) rate-limits and
+// stores the lead server-side.
+export async function callLeadCapture<T = { ok: boolean }>(payload: {
+  name: string;
+  email: string;
+  source: string;
+}): Promise<T> {
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/lead-capture`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${anonKey}`,
+      apikey: anonKey,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data?.error) {
+    throw new EdgeFunctionError(data?.detail || data?.error || `fn-${res.status}`, {
+      code: typeof data?.error === "string" ? data.error : undefined,
+    });
+  }
+  return data as T;
+}
+
 export function callBrible<T = { remaining?: number }>(supabase: SupabaseClient, payload: unknown) {
   return callEdgeFunction<T>(supabase, "brible", payload);
 }

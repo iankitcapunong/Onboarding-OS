@@ -116,6 +116,14 @@ body {
   background-attachment: fixed, fixed, fixed;
 }
 
+/* iOS Safari doesn't honor fixed attachment and falls back to expensive
+   full-page repaints on every scroll — a major source of mobile jank. */
+@media (max-width: 768px) {
+  body {
+    background-attachment: scroll, scroll, scroll;
+  }
+}
+
 /* Still used by demo.html / funnel.html for their 3D globe scene
    (js/bg-globe.js) — index.html no longer renders anything into it. */
 .page-scene {
@@ -157,12 +165,14 @@ main,
   width: 900px;
   height: 900px;
   transform: translate(-50%, -50%);
-  background: radial-gradient(ellipse 50% 42% at 50% 50%, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.14) 55%, transparent 75%);
-  filter: blur(60px) saturate(0.5);
-  mix-blend-mode: luminosity;
+  /* Softness lives in the gradient stops themselves rather than a huge
+     blur + luminosity blend — those two together repainted the whole
+     hero every frame and rendered inconsistently on Safari/Android. */
+  background: radial-gradient(ellipse 50% 42% at 50% 50%, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08) 45%, rgba(255, 255, 255, 0.03) 62%, transparent 78%);
   -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%, black 80%, transparent);
   mask-image: linear-gradient(to bottom, transparent, black 15%, black 80%, transparent);
   animation: glow-drift 10s ease-in-out infinite;
+  will-change: transform, opacity;
   pointer-events: none;
   z-index: 0;
 }
@@ -633,8 +643,23 @@ main,
   #results::before { left: -90px; top: -70px; }
   #results::after { right: -80px; bottom: -80px; }
 
-  /* Smaller drift so orbs never swallow a narrow section */
-  @keyframes orb-drift {
+  /* Smaller drift so orbs never swallow a narrow section. A same-name
+     @keyframes inside a media query does NOT scope to that query — the
+     last global definition wins everywhere — so this must be a distinct
+     name switched in via animation-name. */
+  #pain::after,
+  #how::after,
+  #features::after,
+  #testimonials::after,
+  #faq::after,
+  #results::before,
+  #results::after,
+  .final-cta::before,
+  .final-cta::after {
+    animation-name: orb-drift-soft;
+  }
+
+  @keyframes orb-drift-soft {
     0%, 100% { transform: translate(0, 0) scale(1); }
     33% { transform: translate(28px, -20px) scale(1.12); }
     66% { transform: translate(-14px, 16px) scale(0.94); }

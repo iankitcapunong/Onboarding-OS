@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { callLeadCapture } from "@/lib/edgeFunctions";
+
 const LEAD_KEY = "bsl_lead";
 
 /* Ported from js/landing.js's VSL player + lead-capture modal, which are
@@ -9,6 +11,7 @@ const LEAD_KEY = "bsl_lead";
    opens the lead modal. */
 export function DemoVsl() {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playFailed, setPlayFailed] = useState(false);
   const [progress, setProgress] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -39,19 +42,27 @@ export function DemoVsl() {
     if (lastFocused.current instanceof HTMLElement) lastFocused.current.focus();
   }
 
+  function armPopupTimer() {
+    if (popupTimer.current !== null) return;
+    if (localStorage.getItem(LEAD_KEY)) return;
+    popupTimer.current = window.setTimeout(openLeadModal, 8000);
+  }
+
   function startVideo() {
     if (isPlaying) return;
-    setIsPlaying(true);
-    videoRef.current?.play();
-
-    if (!localStorage.getItem(LEAD_KEY)) {
-      popupTimer.current = window.setTimeout(openLeadModal, 8000);
-    }
+    // play() can be rejected (iOS low-power mode, data saver, decode
+    // failure). isPlaying flips in onPlay — only once playback actually
+    // starts — so a rejection leaves the poster up instead of a black,
+    // frozen-looking player. The fallback hands over native controls.
+    videoRef.current?.play().catch(() => setPlayFailed(true));
   }
 
   function stopVideo() {
     setIsPlaying(false);
-    if (popupTimer.current) window.clearTimeout(popupTimer.current);
+    if (popupTimer.current) {
+      window.clearTimeout(popupTimer.current);
+      popupTimer.current = null;
+    }
     videoRef.current?.pause();
   }
 
@@ -63,7 +74,14 @@ export function DemoVsl() {
     return () => document.removeEventListener("keydown", onEscape);
   }, [modalOpen]);
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    return () => {
+      if (popupTimer.current) window.clearTimeout(popupTimer.current);
+      document.body.style.overflow = "";
+    };
+  }, []);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
     const name = (form.elements.namedItem("name") as HTMLInputElement).value.trim();
@@ -82,14 +100,18 @@ export function DemoVsl() {
     }
 
     setSubmitting(true);
-    setTimeout(() => {
-      localStorage.setItem(
-        LEAD_KEY,
-        JSON.stringify({ name, email, source: "video", at: new Date().toISOString() })
-      );
-      setSubmitting(false);
-      setSubmitted(true);
-    }, 900);
+    try {
+      await callLeadCapture({ name, email, source: "video" });
+    } catch {
+      // A failed network call must not strand the visitor on a spinner —
+      // the localStorage copy below still records the lead client-side.
+    }
+    localStorage.setItem(
+      LEAD_KEY,
+      JSON.stringify({ name, email, source: "video", at: new Date().toISOString() })
+    );
+    setSubmitting(false);
+    setSubmitted(true);
   }
 
   return (
@@ -114,23 +136,27 @@ export function DemoVsl() {
             className="vsl-video"
             ref={videoRef}
             src="/media/vsl-demo.mp4"
+            poster="/media/vsl-poster.jpg"
             playsInline
             preload="metadata"
-            controls={isPlaying}
+            controls={isPlaying || playFailed}
+            onPlay={() => {
+              setIsPlaying(true);
+              armPopupTimer();
+            }}
             onTimeUpdate={(e) => {
               const v = e.currentTarget;
               if (v.duration) setProgress((v.currentTime / v.duration) * 100);
             }}
             onEnded={stopVideo}
           />
-          {!isPlaying && (
+          {!isPlaying && !playFailed && (
             <div className="vsl-poster">
               <div className="vsl-play" aria-hidden="true">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path d="M8 5.14v13.72a1 1 0 0 0 1.52.86l11-6.86a1 1 0 0 0 0-1.72l-11-6.86A1 1 0 0 0 8 5.14z" />
                 </svg>
               </div>
-              <span className="vsl-caption">Watch the walkthrough</span>
             </div>
           )}
           <div className="vsl-progress">
