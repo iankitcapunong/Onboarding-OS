@@ -58,8 +58,13 @@ export function callSheetsLog<T = unknown>(supabase: SupabaseClient, sheet: stri
 // against that deployment's owner, not the caller.
 export async function callAgentTalk<T = { reply: string }>(payload: {
   slug: string;
-  message: string;
-  history: { role: "user" | "assistant"; content: string }[];
+  message?: string;
+  history?: { role: "user" | "assistant"; content: string }[];
+  // Client-generated uuid — presence turns on server-side transcript
+  // logging for the owner's Agent logs tab.
+  sessionId?: string;
+  // "end" marks the session finished instead of sending a message.
+  action?: "end";
 }): Promise<T> {
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/agent-talk`, {

@@ -1,10 +1,17 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { callAgentTalk, EdgeFunctionError } from "@/lib/edgeFunctions";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
+
+/* One session id per browser tab per slug, surviving refresh — the
+   server logs the transcript under it so the deploying account can
+   review the conversation in /app/logs. */
+function sessionStorageKey(slug: string) {
+  return `bsl_talk_session:${slug}`;
+}
 
 /* Public, unauthenticated page — this is the link a Deploy-tab account
    pastes into an email or SMS. No AuthProvider/AppShell here on purpose
@@ -18,8 +25,20 @@ export default function TalkPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [ended, setEnded] = useState(false);
   const [fatalError, setFatalError] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const sessionIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const key = sessionStorageKey(slug);
+    let id = sessionStorage.getItem(key);
+    if (!id) {
+      id = crypto.randomUUID();
+      sessionStorage.setItem(key, id);
+    }
+    sessionIdRef.current = id;
+  }, [slug]);
 
   function scrollToBottom() {
     requestAnimationFrame(() => {
@@ -30,7 +49,7 @@ export default function TalkPage() {
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     const text = input.trim();
-    if (!text || sending) return;
+    if (!text || sending || ended) return;
 
     const history = messages;
     const next = [...messages, { role: "user" as const, content: text }];
@@ -40,13 +59,25 @@ export default function TalkPage() {
     scrollToBottom();
 
     try {
-      const { reply } = await callAgentTalk({ slug, message: text, history });
+      const { reply } = await callAgentTalk({
+        slug,
+        message: text,
+        history,
+        sessionId: sessionIdRef.current ?? undefined,
+      });
       setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
     } catch (err) {
       if (err instanceof EdgeFunctionError && err.code === "not_found") {
         setFatalError("This onboarding link isn't active. Ask whoever sent it to check the Deploy tab.");
       } else if (err instanceof EdgeFunctionError && err.code === "unavailable") {
         setMessages((prev) => [...prev, { role: "assistant", content: "This onboarding agent is temporarily unavailable. Please try again in a bit." }]);
+      } else if (err instanceof EdgeFunctionError && err.code === "session_mismatch") {
+        // Stale id from a deleted/re-published deployment — mint a fresh
+        // one and let the visitor simply send again.
+        const fresh = crypto.randomUUID();
+        sessionStorage.setItem(sessionStorageKey(slug), fresh);
+        sessionIdRef.current = fresh;
+        setMessages((prev) => [...prev, { role: "assistant", content: "Something went wrong sending that — try again?" }]);
       } else {
         setMessages((prev) => [...prev, { role: "assistant", content: "Something went wrong sending that — try again?" }]);
       }
@@ -54,6 +85,18 @@ export default function TalkPage() {
       setSending(false);
       scrollToBottom();
     }
+  }
+
+  async function handleEnd() {
+    if (ended || messages.length === 0) return;
+    setEnded(true);
+    try {
+      await callAgentTalk({ slug, action: "end", sessionId: sessionIdRef.current ?? undefined });
+    } catch {
+      // Ending is a courtesy signal — nothing for the visitor to fix.
+    }
+    // Next visit starts a fresh conversation.
+    sessionStorage.removeItem(sessionStorageKey(slug));
   }
 
   if (fatalError) {
@@ -68,10 +111,17 @@ export default function TalkPage() {
 
   return (
     <div style={{ maxWidth: 640, margin: "0 auto", padding: "32px 20px", minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
-      <div style={{ marginBottom: 16 }}>
-        <span className="pp-label">Onboarding</span>
-        <h1 style={{ margin: "4px 0 0", fontSize: 22 }}>Let&apos;s get you set up</h1>
-        <p className="panel-sub" style={{ marginTop: 4 }}>Answer a few questions and we&apos;ll take it from here.</p>
+      <div style={{ marginBottom: 16, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+        <div>
+          <span className="pp-label">Onboarding</span>
+          <h1 style={{ margin: "4px 0 0", fontSize: 22 }}>Let&apos;s get you set up</h1>
+          <p className="panel-sub" style={{ marginTop: 4 }}>Answer a few questions and we&apos;ll take it from here.</p>
+        </div>
+        {messages.length > 0 && !ended && (
+          <button type="button" className="btn btn-secondary btn-sm" onClick={handleEnd}>
+            End chat
+          </button>
+        )}
       </div>
 
       <div
@@ -105,18 +155,23 @@ export default function TalkPage() {
         {sending && (
           <div style={{ alignSelf: "flex-start", color: "var(--ink-3)", fontSize: 13 }}>Thinking…</div>
         )}
+        {ended && (
+          <div style={{ alignSelf: "center", color: "var(--ink-3)", fontSize: 13, marginTop: 8 }}>
+            Chat ended — thanks for your time!
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleSend} style={{ display: "flex", gap: 8, marginTop: 12 }}>
         <input
           className="input"
-          placeholder="Type your message…"
+          placeholder={ended ? "This chat has ended" : "Type your message…"}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          disabled={sending}
+          disabled={sending || ended}
           autoFocus
         />
-        <button type="submit" className="btn btn-primary" disabled={sending || !input.trim()}>
+        <button type="submit" className="btn btn-primary" disabled={sending || ended || !input.trim()}>
           <span className="btn-label">Send</span>
         </button>
       </form>
