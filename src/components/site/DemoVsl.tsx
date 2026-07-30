@@ -113,7 +113,7 @@ export function DemoVsl() {
           <video
             className="vsl-video"
             ref={videoRef}
-            src="/media/demo-walkthrough.mp4"
+            src="/media/vsl-demo.mp4"
             playsInline
             preload="metadata"
             controls={isPlaying}

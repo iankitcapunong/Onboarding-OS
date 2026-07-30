@@ -4,6 +4,7 @@ import { BrandMark } from "@/components/site/BrandMark";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { BgGlobe } from "@/components/site/BgGlobe";
 import { PageMotion } from "@/components/site/PageMotion";
+import { DemoVsl } from "@/components/site/DemoVsl";
 
 export const metadata: Metadata = {
   title: "Onboarding OS · The System for Client Onboarding",
@@ -54,13 +55,9 @@ export default function HomePage() {
               Onboarding OS interviews your clients, captures every detail, and generates your email copy, ad copy, and landing page copy. Automatically, in minutes.
             </p>
 
+            <DemoVsl />
+
             <div className="hero-ctas">
-              <Link href="/demo" className="btn btn-glow btn-lg">
-                Watch the demo
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="m5 3 14 9-14 9V3z" />
-                </svg>
-              </Link>
               <a href="#features" className="btn btn-ghost-light btn-lg">See what&apos;s inside</a>
             </div>
             <p className="hero-note">A full tour of the platform — the onboarding flow, the dashboard, and everything it generates</p>
