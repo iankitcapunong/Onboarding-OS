@@ -18,7 +18,7 @@ export class EdgeFunctionError extends Error {
    (detail > error > "fn-<status>"). */
 async function callEdgeFunction<T = unknown>(
   supabase: SupabaseClient,
-  name: "brible" | "imagegen" | "videogen" | "sheets-log" | "credits" | "provision-profile" | "admin-clients",
+  name: "brible" | "imagegen" | "videogen" | "sheets-log" | "credits" | "provision-profile" | "admin-clients" | "stripe-checkout",
   payload: unknown
 ): Promise<T> {
   const {
@@ -149,6 +149,19 @@ export function callCredits<T = { remaining?: number }>(supabase: SupabaseClient
 // an account's first call (subsequent calls are a no-op server-side).
 export function callProvisionProfile<T = { plan?: string }>(supabase: SupabaseClient, plan: string) {
   return callEdgeFunction<T>(supabase, "provision-profile", { plan });
+}
+
+// Creates a Stripe Checkout / Billing Portal session server-side and
+// returns its URL — the browser never talks to Stripe directly. Plan
+// and credits only change once stripe-webhook confirms payment.
+export function callStripeCheckout<T = { url: string }>(
+  supabase: SupabaseClient,
+  payload:
+    | { action: "subscribe"; plan: "starter" | "growth" | "full" }
+    | { action: "topup"; pack: "small" | "large" }
+    | { action: "portal" }
+) {
+  return callEdgeFunction<T>(supabase, "stripe-checkout", payload);
 }
 
 export type ClientCredits = { allowance: number; used: number; remaining: number };

@@ -22,6 +22,7 @@ const ROUTE_TITLES: Record<string, string> = {
   videos: "Video studio",
   activity: "Activity",
   access: "Client access",
+  billing: "Billing",
   settings: "Settings",
 };
 

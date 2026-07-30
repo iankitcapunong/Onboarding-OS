@@ -2,14 +2,19 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BrandMark } from "@/components/site/BrandMark";
 import { SiteFooter } from "@/components/site/SiteFooter";
-import { CheckoutForm } from "@/components/site/CheckoutForm";
 
 export const metadata: Metadata = {
-  title: "Checkout · Onboarding OS Pro",
+  title: "Get started · Onboarding OS Pro",
   description:
-    "Start your 7-day free trial of Onboarding OS Pro. Card required, no charge until your trial ends. Cancel anytime.",
+    "Start your 7-day free trial of Onboarding OS Pro. Create your account, then complete secure payment through Stripe. Cancel anytime.",
 };
 
+/* The old page here rendered a SIMULATED card form (CheckoutForm) that
+   validated digits locally and wrote a fake order to localStorage. Real
+   payment now runs through Stripe Checkout from /app/billing after
+   signup — account first, then payment, so the Stripe customer is
+   always tied to a real signed-in user instead of matched by email
+   later. This page just frames the offer and hands off to /signup. */
 export default function CheckoutPage() {
   return (
     <div className="checkout-body">
@@ -31,7 +36,7 @@ export default function CheckoutPage() {
               <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
               <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
-            Secure checkout
+            Secure checkout via Stripe
           </span>
         </div>
       </header>
@@ -40,12 +45,23 @@ export default function CheckoutPage() {
         <div className="container">
           <div className="checkout-head">
             <h1>Start your 7-day free trial</h1>
-            <p>Card required to start — you won&apos;t be charged until your trial ends. Cancel anytime before then.</p>
+            <p>Create your account first — then complete payment through Stripe&apos;s secure checkout. You won&apos;t be charged until your trial ends. Cancel anytime before then.</p>
           </div>
 
           <div className="checkout-grid">
             <div className="card checkout-card">
-              <CheckoutForm />
+              <h2 className="checkout-card-title">How it works</h2>
+              <ol style={{ margin: "12px 0 20px 18px", display: "grid", gap: 10 }}>
+                <li>Create your account (takes under a minute).</li>
+                <li>Pick your plan on the Billing page inside the app.</li>
+                <li>Complete payment on Stripe&apos;s hosted checkout — we never see your card.</li>
+              </ol>
+              <Link className="btn btn-primary btn-lg" href="/signup" style={{ width: "100%", textAlign: "center" }}>
+                <span className="btn-label">Create my account</span>
+              </Link>
+              <p className="order-fine" style={{ marginTop: 12 }}>
+                Already have an account? <Link href="/login">Log in</Link> and head to Billing.
+              </p>
             </div>
 
             <aside className="card checkout-card order-card" aria-label="Order summary">
@@ -59,8 +75,8 @@ export default function CheckoutPage() {
               </div>
               <ul className="price-list order-list">
                 <li>Unlimited onboarding sessions</li>
-                <li>Dashboard, call logs &amp; analytics</li>
-                <li>Prompt playground</li>
+                <li>Dashboard, agent logs &amp; analytics</li>
+                <li>AI assistant builder with instant publish</li>
                 <li>Email, ad &amp; landing copy with spintax</li>
                 <li>Website builder + creative studio</li>
                 <li>3 curated AI models included</li>
