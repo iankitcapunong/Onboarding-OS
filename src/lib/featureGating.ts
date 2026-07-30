@@ -11,10 +11,18 @@
 
 export const ADMIN_EMAILS: string[] = ["bryansumait.contact@gmail.com"];
 
+// "playground" and "deploy" stay in the union so features blobs stored
+// before the Assistants tab replaced those two routes still typecheck —
+// they're gone from FEATURES below, and useFeatureGating maps the old
+// keys onto their successors.
 export type FeatureKey =
   | "agent"
   | "playground"
   | "deploy"
+  | "assistants"
+  | "logs"
+  | "tools"
+  | "integrations"
   | "calls"
   | "onboarding"
   | "assets"
@@ -25,8 +33,10 @@ export type FeatureKey =
 
 export const FEATURES: { key: FeatureKey; label: string }[] = [
   { key: "agent", label: "Onboarding agent" },
-  { key: "playground", label: "Prompt playground" },
-  { key: "deploy", label: "Deploy" },
+  { key: "assistants", label: "Assistants" },
+  { key: "logs", label: "Agent logs" },
+  { key: "tools", label: "Tools" },
+  { key: "integrations", label: "Integrations" },
   { key: "calls", label: "Call logs" },
   { key: "onboarding", label: "Onboarding logs" },
   { key: "assets", label: "Assets" },
@@ -36,11 +46,21 @@ export const FEATURES: { key: FeatureKey; label: string }[] = [
   { key: "videos", label: "Video studio" },
 ];
 
+// A features blob written before the Assistants/Logs/Tools/Integrations
+// tabs existed has no entry for them — inherit the nearest legacy flag
+// (first alias that's explicitly set wins) instead of defaulting a
+// gated-off account to visible.
+export const LEGACY_FEATURE_ALIASES: Partial<Record<FeatureKey, FeatureKey[]>> = {
+  assistants: ["playground", "deploy"],
+  logs: ["calls"],
+  integrations: ["deploy"],
+};
+
 export type PlanKey = "starter" | "growth" | "full" | "custom";
 
 export const PLANS: { key: Exclude<PlanKey, "custom">; label: string; features: FeatureKey[] }[] = [
-  { key: "starter", label: "Starter", features: ["agent", "deploy", "calls", "assets"] },
-  { key: "growth", label: "Growth", features: ["agent", "deploy", "calls", "assets", "playground", "brible", "creative"] },
+  { key: "starter", label: "Starter", features: ["agent", "assistants", "logs", "calls", "assets"] },
+  { key: "growth", label: "Growth", features: ["agent", "assistants", "logs", "tools", "integrations", "calls", "assets", "brible", "creative"] },
   { key: "full", label: "Full access", features: FEATURES.map((f) => f.key) },
 ];
 

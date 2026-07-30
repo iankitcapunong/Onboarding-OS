@@ -1,13 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { SideNav } from "./SideNav";
 import { Topbar, ROUTE_TITLES } from "./Topbar";
 import { useFeatureGating } from "@/hooks/useFeatureGating";
 import { useCredits } from "@/hooks/useCredits";
 import { CreditsExhaustedModal } from "./CreditsExhaustedModal";
+
+/* Server-side gating only ever hid the sidebar LINK — a gated-off client
+   could still type /app/brible into the address bar and use the page.
+   This closes that: once the account's real features row has loaded,
+   a route whose feature is off bounces to the dashboard. Waiting on
+   `loaded` matters — before the fetch resolves, featureOn() answers an
+   optimistic true and a redirect decision would bounce allowed users. */
+function FeatureGuard({ route, children }: { route: string; children: React.ReactNode }) {
+  const router = useRouter();
+  const { featureOn, loaded } = useFeatureGating();
+  const blocked = loaded && !featureOn(route);
+
+  useEffect(() => {
+    if (blocked) router.replace("/app/dashboard");
+  }, [blocked, router]);
+
+  if (blocked) return null;
+  return <>{children}</>;
+}
 
 function PlanChip() {
   const { isAdmin, planLabel } = useFeatureGating();
@@ -54,7 +73,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="app-frame">
         <Topbar title={title} onMenuClick={() => setSidebarOpen((v) => !v)} />
         <main className="app-main" id="appMain" tabIndex={-1}>
-          {children}
+          <FeatureGuard route={route}>{children}</FeatureGuard>
         </main>
       </div>
     </>

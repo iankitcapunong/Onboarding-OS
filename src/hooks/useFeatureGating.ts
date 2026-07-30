@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "./useAuth";
 import { createClient } from "@/lib/supabase/client";
-import { ADMIN_EMAILS, FEATURES, FeatureKey, PlanKey, planLabel } from "@/lib/featureGating";
+import { ADMIN_EMAILS, FEATURES, FeatureKey, LEGACY_FEATURE_ALIASES, PlanKey, planLabel } from "@/lib/featureGating";
 
 type RemoteAccess = { plan: PlanKey; features: Partial<Record<FeatureKey, boolean>> | null };
 
@@ -55,7 +55,22 @@ export function useFeatureGating() {
 
     const myFeatures = {} as Record<FeatureKey, boolean>;
     FEATURES.forEach((f) => {
-      myFeatures[f.key] = overrides ? overrides[f.key] !== false : true;
+      if (!overrides) {
+        myFeatures[f.key] = true;
+        return;
+      }
+      let flag = overrides[f.key];
+      if (flag === undefined) {
+        // Blob predates this feature key — inherit the first legacy
+        // alias an admin explicitly set (e.g. assistants <- playground).
+        for (const alias of LEGACY_FEATURE_ALIASES[f.key] ?? []) {
+          if (overrides[alias] !== undefined) {
+            flag = overrides[alias];
+            break;
+          }
+        }
+      }
+      myFeatures[f.key] = flag !== false;
     });
 
     function featureOn(key: string) {
@@ -64,6 +79,10 @@ export function useFeatureGating() {
       return myFeatures[key as FeatureKey];
     }
 
-    return { isAdmin, myFeatures, planKey, planLabel: planLabel(planKey), featureOn };
+    // loaded = this account's real profiles row has been fetched. Route
+    // guards must wait for it — before that, featureOn optimistically
+    // answers true ("no override = full access") and a redirect decision
+    // taken then would bounce users off pages they're allowed on.
+    return { isAdmin, myFeatures, planKey, planLabel: planLabel(planKey), featureOn, loaded: remote !== null };
   }, [email, remote]);
 }

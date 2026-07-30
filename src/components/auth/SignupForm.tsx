@@ -16,10 +16,10 @@ type Order = {
 };
 
 const ADDON_KEYS = ["brible", "creative", "images", "videos"] as const;
-const DEFAULT_FEATURE_KEYS = ["agent", "playground", "deploy", "calls", "onboarding", "assets"] as const;
+const DEFAULT_FEATURE_KEYS = ["agent", "assistants", "logs", "tools", "integrations", "calls", "onboarding", "assets"] as const;
 const PLAN_FEATURES: Record<string, readonly string[]> = {
-  starter: ["agent", "deploy", "calls", "assets"],
-  growth: ["agent", "deploy", "calls", "assets", "playground", "brible", "creative"],
+  starter: ["agent", "assistants", "logs", "calls", "assets"],
+  growth: ["agent", "assistants", "logs", "tools", "integrations", "calls", "assets", "brible", "creative"],
   full: [...DEFAULT_FEATURE_KEYS, ...ADDON_KEYS],
 };
 

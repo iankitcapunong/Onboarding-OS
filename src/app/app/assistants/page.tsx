@@ -1,0 +1,240 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/components/app/ToastProvider";
+import { createClient } from "@/lib/supabase/client";
+import { getJSON, scopedKey } from "@/lib/storage";
+import {
+  AssistantRow,
+  DeploymentRow,
+  DEFAULT_ASSISTANT,
+  stripVoiceBlock,
+} from "@/lib/assistantTemplate";
+
+type LegacyPlaygroundState = { persona?: string; voice?: string; prompt?: string };
+
+export default function AssistantsPage() {
+  const { user } = useAuth();
+  const toast = useToast();
+  const router = useRouter();
+  const [supabase] = useState(() => createClient());
+  const [assistants, setAssistants] = useState<AssistantRow[] | null>(null);
+  const [deployments, setDeployments] = useState<Record<string, DeploymentRow>>({});
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+
+    async function load() {
+      const { data: rows, error } = await supabase
+        .from("assistants")
+        .select("id, name, first_message, persona, prompt, voice, model, created_at, updated_at")
+        .order("created_at", { ascending: true });
+      if (cancelled) return;
+      if (error) {
+        toast(error.message);
+        setAssistants([]);
+        return;
+      }
+
+      let list = (rows ?? []) as AssistantRow[];
+
+      // One-time migration: accounts that only ever used the old
+      // Playground have their draft in localStorage and no rows here
+      // (accounts that DEPLOYED were backfilled by migration 0006).
+      if (list.length === 0) {
+        const legacy = getJSON<LegacyPlaygroundState>(
+          scopedKey("bsl_playground", user?.email || "guest")
+        );
+        if (legacy?.persona || legacy?.prompt) {
+          const { data: created } = await supabase
+            .from("assistants")
+            .insert({
+              user_id: user!.id,
+              name: DEFAULT_ASSISTANT.name,
+              first_message: DEFAULT_ASSISTANT.first_message,
+              persona: legacy.persona ?? DEFAULT_ASSISTANT.persona,
+              prompt: stripVoiceBlock(legacy.prompt ?? DEFAULT_ASSISTANT.prompt),
+              voice: legacy.voice ?? DEFAULT_ASSISTANT.voice,
+            })
+            .select("id, name, first_message, persona, prompt, voice, model, created_at, updated_at")
+            .single();
+          if (created) list = [created as AssistantRow];
+        }
+      }
+
+      if (cancelled) return;
+      setAssistants(list);
+
+      if (list.length > 0) {
+        const { data: deps } = await supabase
+          .from("agent_deployments")
+          .select("id, assistant_id, slug, updated_at");
+        if (cancelled) return;
+        const map: Record<string, DeploymentRow> = {};
+        (deps ?? []).forEach((d) => {
+          map[(d as DeploymentRow).assistant_id] = d as DeploymentRow;
+        });
+        setDeployments(map);
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, supabase, toast]);
+
+  async function handleNew() {
+    if (!user || busy) return;
+    setBusy(true);
+    try {
+      const { data, error } = await supabase
+        .from("assistants")
+        .insert({
+          user_id: user.id,
+          name: "Untitled assistant",
+          first_message: DEFAULT_ASSISTANT.first_message,
+          persona: DEFAULT_ASSISTANT.persona,
+          prompt: DEFAULT_ASSISTANT.prompt,
+          voice: DEFAULT_ASSISTANT.voice,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      router.push(`/app/assistants/${(data as { id: string }).id}`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Couldn't create an assistant");
+      setBusy(false);
+    }
+  }
+
+  async function handleDuplicate(a: AssistantRow) {
+    if (!user || busy) return;
+    setBusy(true);
+    try {
+      const { data, error } = await supabase
+        .from("assistants")
+        .insert({
+          user_id: user.id,
+          name: `${a.name} (copy)`,
+          first_message: a.first_message,
+          persona: a.persona,
+          prompt: a.prompt,
+          voice: a.voice,
+          model: a.model,
+        })
+        .select("id, name, first_message, persona, prompt, voice, model, created_at, updated_at")
+        .single();
+      if (error) throw error;
+      setAssistants((prev) => [...(prev ?? []), data as AssistantRow]);
+      toast("Assistant duplicated", true);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Couldn't duplicate");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete(a: AssistantRow) {
+    const deployed = deployments[a.id];
+    const warning = deployed
+      ? `Delete "${a.name}"? Its public link /talk/${deployed.slug} will stop working immediately.`
+      : `Delete "${a.name}"? This can't be undone.`;
+    if (!confirm(warning)) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase.from("assistants").delete().eq("id", a.id);
+      if (error) throw error;
+      setAssistants((prev) => (prev ?? []).filter((x) => x.id !== a.id));
+      toast("Assistant deleted", true);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Couldn't delete");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleCopyLink(slug: string) {
+    const link = `${window.location.origin}/talk/${slug}`;
+    if (navigator.clipboard) navigator.clipboard.writeText(link);
+    toast("Link copied", true);
+  }
+
+  return (
+    <>
+      <div className="page-head">
+        <div>
+          <h2>Assistants</h2>
+          <p className="page-sub">
+            Build and publish your AI onboarding agents. Edit the prompt in one place — publish, and the
+            public link serves the new version instantly.
+          </p>
+        </div>
+        <button type="button" className="btn btn-primary" onClick={handleNew} disabled={busy}>
+          <span className="btn-label">New assistant</span>
+        </button>
+      </div>
+
+      {assistants === null ? (
+        <div className="panel">
+          <p className="panel-sub">Loading…</p>
+        </div>
+      ) : assistants.length === 0 ? (
+        <div className="panel">
+          <h3>No assistants yet</h3>
+          <p className="panel-sub">
+            Create your first AI onboarding assistant — set its persona and prompt, then publish it to get
+            a shareable link.
+          </p>
+          <button type="button" className="btn btn-primary" style={{ marginTop: 12 }} onClick={handleNew} disabled={busy}>
+            <span className="btn-label">Create your first assistant</span>
+          </button>
+        </div>
+      ) : (
+        assistants.map((a) => {
+          const dep = deployments[a.id];
+          return (
+            <div className="panel" key={a.id} style={{ marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ minWidth: 220 }}>
+                  <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {a.name}
+                    {dep ? (
+                      <span className="side-badge" title={`Published at /talk/${dep.slug}`}>Live</span>
+                    ) : (
+                      <span className="side-badge side-badge-admin">Draft</span>
+                    )}
+                  </h3>
+                  <p className="panel-sub" style={{ margin: "4px 0 0" }}>
+                    Updated {new Date(a.updated_at).toLocaleString()}
+                    {dep ? ` · /talk/${dep.slug}` : " · not published yet"}
+                  </p>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button type="button" className="btn btn-primary btn-sm" onClick={() => router.push(`/app/assistants/${a.id}`)}>
+                    Edit
+                  </button>
+                  {dep && (
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleCopyLink(dep.slug)}>
+                      Copy link
+                    </button>
+                  )}
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleDuplicate(a)} disabled={busy}>
+                    Duplicate
+                  </button>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleDelete(a)} disabled={busy}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })
+      )}
+    </>
+  );
+}

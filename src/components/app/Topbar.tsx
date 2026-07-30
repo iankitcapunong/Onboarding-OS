@@ -7,6 +7,10 @@ import { useAuth } from "@/hooks/useAuth";
 const ROUTE_TITLES: Record<string, string> = {
   dashboard: "Dashboard",
   agent: "Onboarding flow",
+  assistants: "Assistants",
+  logs: "Agent logs",
+  tools: "Tools",
+  integrations: "Integrations",
   playground: "Playground",
   deploy: "Deploy",
   calls: "Call logs",
