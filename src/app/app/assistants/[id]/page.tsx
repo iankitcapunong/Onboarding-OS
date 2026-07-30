@@ -9,7 +9,7 @@ import { useCredits } from "@/hooks/useCredits";
 import { useToast } from "@/components/app/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
 import { callBrible } from "@/lib/edgeFunctions";
-import { AssistantRow, DeploymentRow, stripVoiceBlock } from "@/lib/assistantTemplate";
+import { AssistantRow, DeploymentRow, errorMessage, stripVoiceBlock } from "@/lib/assistantTemplate";
 
 function randomSlug() {
   return crypto.randomUUID().replace(/-/g, "").slice(0, 10);
@@ -130,7 +130,7 @@ export default function AssistantEditorPage({ params }: { params: Promise<{ id: 
       toast("Assistant saved", true);
       return cleaned;
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Couldn't save right now");
+      toast(errorMessage(err, "Couldn't save right now"));
       return null;
     } finally {
       setSaving(false);
@@ -172,7 +172,7 @@ export default function AssistantEditorPage({ params }: { params: Promise<{ id: 
       setDeployment(data as DeploymentRow);
       toast(wasLive ? "Live version updated" : "Assistant published", true);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Couldn't publish right now");
+      toast(errorMessage(err, "Couldn't publish right now"));
     } finally {
       setPublishing(false);
     }

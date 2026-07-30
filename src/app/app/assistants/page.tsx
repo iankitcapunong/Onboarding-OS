@@ -10,6 +10,7 @@ import {
   AssistantRow,
   DeploymentRow,
   DEFAULT_ASSISTANT,
+  errorMessage,
   stripVoiceBlock,
 } from "@/lib/assistantTemplate";
 
@@ -107,7 +108,7 @@ export default function AssistantsPage() {
       if (error) throw error;
       router.push(`/app/assistants/${(data as { id: string }).id}`);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Couldn't create an assistant");
+      toast(errorMessage(err, "Couldn't create an assistant"));
       setBusy(false);
     }
   }
@@ -133,7 +134,7 @@ export default function AssistantsPage() {
       setAssistants((prev) => [...(prev ?? []), data as AssistantRow]);
       toast("Assistant duplicated", true);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Couldn't duplicate");
+      toast(errorMessage(err, "Couldn't duplicate"));
     } finally {
       setBusy(false);
     }
@@ -152,7 +153,7 @@ export default function AssistantsPage() {
       setAssistants((prev) => (prev ?? []).filter((x) => x.id !== a.id));
       toast("Assistant deleted", true);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Couldn't delete");
+      toast(errorMessage(err, "Couldn't delete"));
     } finally {
       setBusy(false);
     }

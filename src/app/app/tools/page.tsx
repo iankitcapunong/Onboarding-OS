@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/app/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
+import { errorMessage } from "@/lib/assistantTemplate";
 
 type ToolRow = {
   id: string;
@@ -120,7 +121,7 @@ export default function ToolsPage() {
       setScope("all");
       toast("Webhook added", true);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Couldn't add the webhook");
+      toast(errorMessage(err, "Couldn't add the webhook"));
     } finally {
       setBusy(false);
     }

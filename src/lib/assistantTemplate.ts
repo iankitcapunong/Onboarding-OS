@@ -40,6 +40,17 @@ export function stripVoiceBlock(prompt: string): string {
   return prompt.replace(VOICE_BLOCK_RE, "").replace(/\s+$/, "");
 }
 
+/* Supabase's PostgrestError doesn't always survive an `instanceof
+   Error` check (bundling realms), which turned real failures — like
+   "relation does not exist" before migrations were applied — into a
+   generic toast. Pull .message off anything that has one. */
+export function errorMessage(err: unknown, fallback: string): string {
+  if (err && typeof err === "object" && "message" in err && typeof (err as { message: unknown }).message === "string") {
+    return (err as { message: string }).message;
+  }
+  return fallback;
+}
+
 export type AssistantRow = {
   id: string;
   name: string;
