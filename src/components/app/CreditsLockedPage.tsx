@@ -9,7 +9,7 @@ export function CreditsLockedPage({ feature }: { feature: string }) {
   const reason = trialExpired
     ? `${feature} is locked because your 7-day free trial has ended.`
     : planKey === "pro"
-      ? `${feature} is locked until your credits reset next month — or top up now from the Billing page.`
+      ? `${feature} is locked until your credits reset next month.`
       : `${feature} is locked because you've used your trial credits.`;
 
   return (

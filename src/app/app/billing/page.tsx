@@ -13,13 +13,7 @@ const PRO_FEATURES = [
   "Everything unlocked — agent, assistants, tools, integrations",
   "Website builder, creative ads, image & video studios",
   `${PLAN_CREDITS.pro.toLocaleString()} credits every month`,
-  "Credit top-ups whenever you need more",
   "Cancel anytime from the billing portal",
-];
-
-const TOPUPS: { pack: "small" | "large"; credits: number; label: string }[] = [
-  { pack: "small", credits: 250, label: "Small top-up" },
-  { pack: "large", credits: 1000, label: "Large top-up" },
 ];
 
 // useSearchParams() needs a Suspense boundary for static prerendering.
@@ -131,31 +125,6 @@ function BillingContent() {
         </div>
       )}
 
-      {!isAdmin && isPro && (
-        <div className="panel">
-          <h3>Credit top-ups</h3>
-          <p className="panel-sub">
-            Pay-as-you-go: one-time packs added to this month&rsquo;s balance the moment Stripe confirms
-            payment.
-          </p>
-          <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
-            {TOPUPS.map((t) => (
-              <button
-                key={t.pack}
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => go({ action: "topup", pack: t.pack }, `topup-${t.pack}`)}
-                disabled={busy !== null}
-              >
-                {busy === `topup-${t.pack}` ? "Opening…" : `${t.label} · +${t.credits} credits`}
-              </button>
-            ))}
-          </div>
-          <p className="hint" style={{ marginTop: 10 }}>
-            Top-ups apply to the current month&rsquo;s balance and don&rsquo;t roll over.
-          </p>
-        </div>
-      )}
     </>
   );
 }

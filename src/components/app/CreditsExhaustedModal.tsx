@@ -55,7 +55,7 @@ export function CreditsExhaustedModal() {
   const body = trialExpired
     ? "Your 7-day free trial is over. Upgrade to Pro to keep using AI features — everything you built is still here waiting."
     : planKey === "pro"
-      ? "You've used this month's credits. Grab a top-up from the Billing page, or they reset automatically next month."
+      ? "You've used this month's credits — they reset automatically next month."
       : `You've used the ${PLAN_CREDITS.trial.toLocaleString()} credits included with your trial. Upgrade to Pro to keep going.`;
 
   return (
