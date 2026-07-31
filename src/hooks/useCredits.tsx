@@ -20,6 +20,11 @@ type CreditsContextValue = {
   planKey: PlanKey;
   /** Either lock — what AI feature pages/actions should gate on. */
   aiLocked: boolean;
+  /** The upgrade/billing modal (CreditsExhaustedModal). Auto-opens when a
+      lock engages, and re-opens on every blocked AI attempt after dismissal. */
+  upgradeModalOpen: boolean;
+  openUpgradeModal: () => void;
+  closeUpgradeModal: () => void;
   spendCredits: (kind: string, count?: number) => boolean;
   syncCreditsFromServer: (remaining: number) => void;
 };
@@ -120,20 +125,39 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
   const creditsLeft = isAdmin ? creditAllowance : Math.max(0, creditAllowance - used);
   const aiLocked = trialExpired || creditsExhausted;
 
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  // Auto-open the billing modal the moment a lock engages, and close it
+  // when the lock lifts (upgrade landed, credits topped up) — same
+  // adjust-during-render pattern as the account-switch reset above.
+  const [prevLocked, setPrevLocked] = useState(aiLocked);
+  if (aiLocked !== prevLocked) {
+    setPrevLocked(aiLocked);
+    setUpgradeModalOpen(aiLocked);
+  }
+  const openUpgradeModal = useCallback(() => setUpgradeModalOpen(true), []);
+  const closeUpgradeModal = useCallback(() => setUpgradeModalOpen(false), []);
+
   const spendCredits = useCallback(
     (kind: string, count = 1) => {
       if (isAdmin) return true;
       if (trialExpired) {
-        toast("Your 7-day free trial has ended — upgrade to Pro to keep going.");
+        setUpgradeModalOpen(true);
         return false;
       }
       const cost = (CREDIT_COSTS[kind] || 0) * count;
       if (creditsLeft < cost) {
-        toast(
-          planKey === "pro"
-            ? `Not enough credits — this needs ${cost} and you have ${creditsLeft}. Top up or wait for next month's reset.`
-            : `Not enough trial credits — this needs ${cost} and you have ${creditsLeft}. Upgrade to Pro for more.`
-        );
+        // Fully out → the billing modal; partially short (some credits
+        // left, just not enough for this action) → an explanatory toast,
+        // since the modal's "you've used everything" copy would be wrong.
+        if (creditsLeft === 0) {
+          setUpgradeModalOpen(true);
+        } else {
+          toast(
+            planKey === "pro"
+              ? `Not enough credits — this needs ${cost} and you have ${creditsLeft}. Top up or wait for next month's reset.`
+              : `Not enough trial credits — this needs ${cost} and you have ${creditsLeft}. Upgrade to Pro for more.`
+          );
+        }
         return false;
       }
       // Optimistic: the Edge Function's echoed `remaining` and the
@@ -162,10 +186,13 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
       trialDaysLeft,
       planKey,
       aiLocked,
+      upgradeModalOpen,
+      openUpgradeModal,
+      closeUpgradeModal,
       spendCredits,
       syncCreditsFromServer,
     }),
-    [creditsLeft, creditAllowance, creditsExhausted, trialExpired, trialEndsAt, trialDaysLeft, planKey, aiLocked, spendCredits, syncCreditsFromServer]
+    [creditsLeft, creditAllowance, creditsExhausted, trialExpired, trialEndsAt, trialDaysLeft, planKey, aiLocked, upgradeModalOpen, openUpgradeModal, closeUpgradeModal, spendCredits, syncCreditsFromServer]
   );
 
   return <CreditsContext.Provider value={value}>{children}</CreditsContext.Provider>;

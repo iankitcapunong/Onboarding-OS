@@ -19,7 +19,7 @@ export default function AssistantEditorPage({ params }: { params: Promise<{ id: 
   const { id } = use(params);
   const { user } = useAuth();
   const { logActivity } = useActivityLog();
-  const { syncCreditsFromServer } = useCredits();
+  const { spendCredits, syncCreditsFromServer } = useCredits();
   const toast = useToast();
   const router = useRouter();
   const [supabase] = useState(() => createClient());
@@ -75,6 +75,10 @@ export default function AssistantEditorPage({ params }: { params: Promise<{ id: 
       toast("Describe the change you want first");
       return;
     }
+    // Same client-side gate as the studio pages: locked or out of
+    // credits → the billing modal opens instead of a doomed API call.
+    // The server still enforces the spend in the brible Edge Function.
+    if (!spendCredits("brible")) return;
     setRewriting(true);
     try {
       const out = await callBrible<{ remaining?: number; persona?: string; prompt?: string }>(supabase, {
