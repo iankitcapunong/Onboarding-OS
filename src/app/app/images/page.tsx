@@ -449,7 +449,7 @@ function GalleryCard({
 export default function ImageStudioPage() {
   const { user } = useAuth();
   const { logActivity } = useActivityLog();
-  const { spendCredits, syncCreditsFromServer, creditsExhausted } = useCredits();
+  const { spendCredits, syncCreditsFromServer, aiLocked } = useCredits();
   const toast = useToast();
   const [supabase] = useState(() => createClient());
 
@@ -693,7 +693,7 @@ export default function ImageStudioPage() {
 
   const showRefField = Boolean(model.needsRef || model.allowsRef);
 
-  if (creditsExhausted) return <CreditsLockedPage feature="Image studio" />;
+  if (aiLocked) return <CreditsLockedPage feature="Image studio" />;
 
   return (
     <>

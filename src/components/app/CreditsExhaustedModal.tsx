@@ -1,23 +1,34 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useCredits } from "@/hooks/useCredits";
+import { PLAN_CREDITS } from "@/lib/featureGating";
 
+/* Covers both locks of the single-plan model: the 7-day trial clock
+   running out, and the credit pot (trial's one-time 3000, or pro's
+   monthly allowance) hitting zero. Dismissible — enforcement lives in
+   spendCredits() and server-side in every Edge Function, this is just
+   the explanation — and suppressed on the billing page, which is where
+   its own CTA sends people. */
 export function CreditsExhaustedModal() {
-  const { creditsExhausted } = useCredits();
+  const { aiLocked, trialExpired, planKey } = useCredits();
+  const pathname = usePathname();
   const [dismissed, setDismissed] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
 
-  // Reset `dismissed` whenever credits go from exhausted back to available,
-  // so a later month hitting 0 again re-shows the popup. Adjusting state
-  // during render (rather than in an effect) avoids an extra render pass.
-  const [prevExhausted, setPrevExhausted] = useState(creditsExhausted);
-  if (creditsExhausted !== prevExhausted) {
-    setPrevExhausted(creditsExhausted);
-    if (!creditsExhausted && dismissed) setDismissed(false);
+  // Reset `dismissed` whenever the lock lifts (upgrade landed, credits
+  // topped up), so hitting a lock again later re-shows the popup.
+  // Adjusting state during render (rather than in an effect) avoids an
+  // extra render pass.
+  const [prevLocked, setPrevLocked] = useState(aiLocked);
+  if (aiLocked !== prevLocked) {
+    setPrevLocked(aiLocked);
+    if (!aiLocked && dismissed) setDismissed(false);
   }
 
-  const open = creditsExhausted && !dismissed;
+  const open = aiLocked && !dismissed && pathname !== "/app/billing";
 
   useEffect(() => {
     if (!open) return;
@@ -35,6 +46,18 @@ export function CreditsExhaustedModal() {
 
   if (!open) return null;
 
+  const title = trialExpired
+    ? "Your free trial has ended"
+    : planKey === "pro"
+      ? "You're out of credits for this month"
+      : "You've used your trial credits";
+
+  const body = trialExpired
+    ? "Your 7-day free trial is over. Upgrade to Pro to keep using AI features — everything you built is still here waiting."
+    : planKey === "pro"
+      ? "You've used this month's credits. Grab a top-up from the Billing page, or they reset automatically next month."
+      : `You've used the ${PLAN_CREDITS.trial.toLocaleString()} credits included with your trial. Upgrade to Pro to keep going.`;
+
   return (
     <div
       className="modal-overlay"
@@ -45,7 +68,7 @@ export function CreditsExhaustedModal() {
       <div className="modal" role="dialog" aria-modal="true" aria-labelledby="creditsExhaustedTitle">
         <div className="modal-head">
           <div className="modal-id">
-            <h3 id="creditsExhaustedTitle">You&apos;re out of credits for this month</h3>
+            <h3 id="creditsExhaustedTitle">{title}</h3>
           </div>
           <button type="button" className="modal-close" aria-label="Close" ref={closeRef} onClick={() => setDismissed(true)}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -55,14 +78,12 @@ export function CreditsExhaustedModal() {
           </button>
         </div>
         <div className="modal-body">
-          <p className="panel-sub">
-            You&apos;ve used all of your credits for this billing period. AI features are locked until they reset next month.
-          </p>
+          <p className="panel-sub">{body}</p>
         </div>
         <div className="modal-foot">
-          <a className="btn btn-primary" href="mailto:bryansumait.automate@gmail.com">
-            Upgrade / contact us
-          </a>
+          <Link className="btn btn-primary" href="/app/billing" onClick={() => setDismissed(true)}>
+            {planKey === "pro" ? "Go to Billing" : "Upgrade to Pro"}
+          </Link>
         </div>
       </div>
     </div>

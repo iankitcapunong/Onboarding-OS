@@ -56,15 +56,21 @@ export const LEGACY_FEATURE_ALIASES: Partial<Record<FeatureKey, FeatureKey[]>> =
   integrations: ["deploy"],
 };
 
-export type PlanKey = "starter" | "growth" | "full" | "custom";
+/* Single-plan model: every account starts a 7-day free trial with a
+   one-time pot of 3000 credits (no card), and the only paid plan is
+   Pro. The server mirror lives in supabase/functions/_shared/limits.ts
+   (PLAN_CREDITS / normalizePlan) — keep in sync by hand. */
+export type PlanKey = "trial" | "pro";
 
-export const PLANS: { key: Exclude<PlanKey, "custom">; label: string; features: FeatureKey[] }[] = [
-  { key: "starter", label: "Starter", features: ["agent", "assistants", "logs", "calls", "assets"] },
-  { key: "growth", label: "Growth", features: ["agent", "assistants", "logs", "tools", "integrations", "calls", "assets", "brible", "creative"] },
-  { key: "full", label: "Full access", features: FEATURES.map((f) => f.key) },
-];
+export const TRIAL_DAYS = 7;
 
-export const PLAN_CREDITS: Record<PlanKey, number> = { starter: 250, growth: 1000, full: 3000, custom: 1000 };
+export const PLAN_CREDITS: Record<PlanKey, number> = { trial: 3000, pro: 10000 };
+
+// Legacy starter/growth/full/custom rows written before the single-plan
+// switch read as a trial; only a Stripe-confirmed 'pro' is pro.
+export function normalizePlan(plan: string | null | undefined): PlanKey {
+  return plan === "pro" ? "pro" : "trial";
+}
 
 // Two-tier pricing: features that call a real, costly upstream API
 // (video generation, brible's multi-call LLM pipeline) charge 50;
@@ -86,15 +92,6 @@ export const CREDIT_COSTS: Record<string, number> = {
   brible: HIGH_COST,
 };
 
-export function planFor(flags: Record<FeatureKey, boolean>): PlanKey {
-  for (const p of PLANS) {
-    const match = FEATURES.every((f) => flags[f.key] === p.features.includes(f.key));
-    if (match) return p.key;
-  }
-  return "custom";
-}
-
 export function planLabel(key: PlanKey | null) {
-  const plan = PLANS.find((p) => p.key === key);
-  return plan?.label ?? "Custom";
+  return key === "pro" ? "Pro" : "Free trial";
 }

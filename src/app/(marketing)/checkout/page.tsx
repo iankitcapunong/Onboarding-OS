@@ -6,7 +6,7 @@ import { SiteFooter } from "@/components/site/SiteFooter";
 export const metadata: Metadata = {
   title: "Get started · Onboarding OS Pro",
   description:
-    "Start your 7-day free trial of Onboarding OS Pro. Create your account, then complete secure payment through Stripe. Cancel anytime.",
+    "Start your 7-day free trial of Onboarding OS — 3,000 credits included, no card required. Upgrade to Pro through Stripe when you're ready.",
 };
 
 /* The old page here rendered a SIMULATED card form (CheckoutForm) that
@@ -45,16 +45,16 @@ export default function CheckoutPage() {
         <div className="container">
           <div className="checkout-head">
             <h1>Start your 7-day free trial</h1>
-            <p>Create your account first — then complete payment through Stripe&apos;s secure checkout. You won&apos;t be charged until your trial ends. Cancel anytime before then.</p>
+            <p>Create your account and you&apos;re in — 7 days and 3,000 credits of full access, no card required. Upgrade to Pro whenever you&apos;re ready; nothing is charged automatically.</p>
           </div>
 
           <div className="checkout-grid">
             <div className="card checkout-card">
               <h2 className="checkout-card-title">How it works</h2>
               <ol style={{ margin: "12px 0 20px 18px", display: "grid", gap: 10 }}>
-                <li>Create your account (takes under a minute).</li>
-                <li>Pick your plan on the Billing page inside the app.</li>
-                <li>Complete payment on Stripe&apos;s hosted checkout — we never see your card.</li>
+                <li>Create your account (takes under a minute) — your free trial starts instantly.</li>
+                <li>Explore everything with 3,000 included credits for 7 days.</li>
+                <li>Upgrade to Pro from the Billing page — payment runs on Stripe&apos;s hosted checkout, we never see your card.</li>
               </ol>
               <Link className="btn btn-primary btn-lg" href="/signup" style={{ width: "100%", textAlign: "center" }}>
                 <span className="btn-label">Create my account</span>
@@ -69,7 +69,7 @@ export default function CheckoutPage() {
               <div className="order-line">
                 <div>
                   <strong>Onboarding OS Pro</strong>
-                  <span>7-day free trial, then monthly</span>
+                  <span>After your free trial · monthly</span>
                 </div>
                 <span className="order-price">$297<em>/mo</em></span>
               </div>
@@ -79,15 +79,14 @@ export default function CheckoutPage() {
                 <li>AI assistant builder with instant publish</li>
                 <li>Email, ad &amp; landing copy with spintax</li>
                 <li>Website builder + creative studio</li>
-                <li>3 curated AI models included</li>
+                <li>10,000 credits every month</li>
               </ul>
               <hr className="order-divider" />
               <div className="order-total">
                 <span>Due today</span>
                 <strong>$0.00</strong>
               </div>
-              <p className="order-fine">Then $297.00/mo after your 7-day free trial — cancel anytime before it ends and you won&apos;t be charged.</p>
-              <p className="order-fine">Website generation add-on (+$149/mo) can be enabled by our team after checkout.</p>
+              <p className="order-fine">Your 7-day trial with 3,000 credits is free — no card required, nothing charged automatically. Pro is $297.00/mo when you choose to upgrade, cancel anytime.</p>
               <Link className="order-back" href="/">← Back to the offer</Link>
             </aside>
           </div>

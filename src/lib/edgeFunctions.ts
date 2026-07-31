@@ -143,21 +143,23 @@ export function callCredits<T = { remaining?: number }>(supabase: SupabaseClient
   return callEdgeFunction<T>(supabase, "credits", { kind, count });
 }
 
-// Sets the real, server-enforced plan for a brand-new account, based on
-// what the signup/trial form computed from chosen add-ons — see
+// Provisions a brand-new account's profile server-side: always the
+// 7-day trial with its one-time credit pot — see
 // supabase/functions/provision-profile/index.ts. Only takes effect on
-// an account's first call (subsequent calls are a no-op server-side).
-export function callProvisionProfile<T = { plan?: string }>(supabase: SupabaseClient, plan: string) {
-  return callEdgeFunction<T>(supabase, "provision-profile", { plan });
+// an account's first call (subsequent calls are a no-op server-side),
+// so an expired trial can't be restarted from here.
+export function callProvisionProfile<T = { plan?: string; trialEndsAt?: string }>(supabase: SupabaseClient) {
+  return callEdgeFunction<T>(supabase, "provision-profile", {});
 }
 
 // Creates a Stripe Checkout / Billing Portal session server-side and
-// returns its URL — the browser never talks to Stripe directly. Plan
-// and credits only change once stripe-webhook confirms payment.
+// returns its URL — the browser never talks to Stripe directly. The
+// only subscription is Pro; plan and credits only change once
+// stripe-webhook confirms payment.
 export function callStripeCheckout<T = { url: string }>(
   supabase: SupabaseClient,
   payload:
-    | { action: "subscribe"; plan: "starter" | "growth" | "full" }
+    | { action: "subscribe" }
     | { action: "topup"; pack: "small" | "large" }
     | { action: "portal" }
 ) {

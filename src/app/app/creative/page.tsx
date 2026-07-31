@@ -53,7 +53,7 @@ function whenLabel(cr: Creative) {
 export default function CreativeAdsPage() {
   const { user } = useAuth();
   const { activeClient } = useMemory();
-  const { spendCredits, syncCreditsFromServer, creditsExhausted } = useCredits();
+  const { spendCredits, syncCreditsFromServer, aiLocked } = useCredits();
   const { logActivity } = useActivityLog();
   const toast = useToast();
   const [supabase] = useState(() => createClient());
@@ -157,7 +157,7 @@ export default function CreativeAdsPage() {
       ? `From memory · ${memForChips.business} (remembered client)`
       : "No call captured yet. Demo details are used until you run an onboarding call.";
 
-  if (creditsExhausted) return <CreditsLockedPage feature="Creative ads" />;
+  if (aiLocked) return <CreditsLockedPage feature="Creative ads" />;
 
   return (
     <>

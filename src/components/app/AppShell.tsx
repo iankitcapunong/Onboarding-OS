@@ -29,15 +29,27 @@ function FeatureGuard({ route, children }: { route: string; children: React.Reac
 }
 
 function PlanChip() {
-  const { isAdmin, planLabel } = useFeatureGating();
-  const { creditsLeft, creditAllowance } = useCredits();
+  const { isAdmin } = useFeatureGating();
+  const { creditsLeft, creditAllowance, planKey, trialDaysLeft, trialExpired } = useCredits();
+
+  let label = "Pro plan";
+  let detail = `${creditsLeft} of ${creditAllowance} credits left`;
+  if (isAdmin) {
+    label = "Admin · Unlimited";
+    detail = "Full access + client controls";
+  } else if (planKey !== "pro") {
+    label = "Free trial";
+    detail = trialExpired
+      ? "Trial ended — upgrade to Pro"
+      : `${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} left · ${creditsLeft} credits`;
+  }
 
   return (
     <div className="plan-chip">
       <span className="plan-dot" aria-hidden="true" />
       <div>
-        <strong>{isAdmin ? "Admin · Unlimited" : `${planLabel} plan`}</strong>
-        <span>{isAdmin ? "Full access + client controls" : `${creditsLeft} of ${creditAllowance} credits left`}</span>
+        <strong>{label}</strong>
+        <span>{detail}</span>
       </div>
     </div>
   );

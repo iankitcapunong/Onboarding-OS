@@ -60,7 +60,7 @@ function whenLabel(a: Asset) {
 
 export default function AssetsPage() {
   const { assets, latestSessionName, generate, clearAll, generating } = useAssets();
-  const { creditsExhausted } = useCredits();
+  const { aiLocked } = useCredits();
   const toast = useToast();
   const [selected, setSelected] = useState<Set<AssetType>>(
     () => new Set(OPTIONS.filter((o) => o.defaultChecked).map((o) => o.value))
@@ -86,7 +86,7 @@ export default function AssetsPage() {
     toast("All assets cleared", true);
   }
 
-  if (creditsExhausted) return <CreditsLockedPage feature="Assets" />;
+  if (aiLocked) return <CreditsLockedPage feature="Assets" />;
 
   return (
     <>

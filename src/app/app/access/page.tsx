@@ -14,7 +14,12 @@ import {
   EdgeFunctionError,
   type AdminClient,
 } from "@/lib/edgeFunctions";
-import { ADMIN_EMAILS, FEATURES, PLANS, planFor, type FeatureKey, type PlanKey } from "@/lib/featureGating";
+import { ADMIN_EMAILS, FEATURES, planLabel, type FeatureKey, type PlanKey } from "@/lib/featureGating";
+
+const PLAN_OPTIONS: { key: PlanKey; label: string }[] = [
+  { key: "trial", label: "Free trial" },
+  { key: "pro", label: "Pro" },
+];
 
 function initials(email: string) {
   return email.slice(0, 2).toUpperCase();
@@ -49,8 +54,7 @@ function ClientRow({
     setTrackedFeatures(client.features);
     setFlags(fullFlags(client.features));
   }
-  const current = planFor(flags);
-  const currentPlanLabel = PLANS.find((p) => p.key === current)?.label ?? "Custom";
+  const current = client.plan;
   const name = client.email.split("@")[0];
   const [creditAmount, setCreditAmount] = useState("");
   const [adjusting, setAdjusting] = useState(false);
@@ -89,21 +93,20 @@ function ClientRow({
     }
   }
 
-  function setPlan(planKey: (typeof PLANS)[number]["key"], planLabel: string, planFeatures: FeatureKey[]) {
-    const next = { ...flags };
-    FEATURES.forEach((f) => {
-      next[f.key] = planFeatures.includes(f.key);
-    });
-    setFlags(next);
-    void persist({ plan: planKey, features: next });
-    logActivity("system", `Set ${client.email} to the ${planLabel} plan`);
-    toast(`${name} moved to ${planLabel}`, true);
+  // Plan and features are independent now — the plan sets the credit
+  // allowance (trial pot vs pro monthly), feature toggles only shape
+  // the sidebar. Flipping someone to Pro here is the manual override
+  // for what stripe-webhook normally does.
+  function setPlan(planKey: PlanKey, label: string) {
+    void persist({ plan: planKey });
+    logActivity("system", `Set ${client.email} to the ${label} plan`);
+    toast(`${name} moved to ${label}`, true);
   }
 
   function toggleFeature(f: (typeof FEATURES)[number]) {
     const next = { ...flags, [f.key]: !flags[f.key] };
     setFlags(next);
-    void persist({ plan: planFor(next), features: next });
+    void persist({ features: next });
     logActivity("system", `${next[f.key] ? "Enabled" : "Disabled"} ${f.label} for ${client.email}`);
     toast(`${f.label}${next[f.key] ? " enabled" : " disabled"} for ${name}`, true);
   }
@@ -145,25 +148,24 @@ function ClientRow({
           <strong>{name}</strong>
           <span>{client.email}</span>
         </div>
-        <span className={`plan-tag${current === "custom" ? " is-custom" : ""}`}>{currentPlanLabel}</span>
+        <span className="plan-tag">{planLabel(current)}</span>
       </div>
 
       <div className="access-section">
         <span className="access-section-label">Plan</span>
         <div className="plan-pills">
-          {PLANS.map((p) => (
+          {PLAN_OPTIONS.map((p) => (
             <button
               key={p.key}
               type="button"
               className={`plan-pill${current === p.key ? " active" : ""}`}
               aria-pressed={current === p.key}
-              title={`${p.features.length} of ${FEATURES.length} features`}
-              onClick={() => setPlan(p.key, p.label, p.features)}
+              title={p.key === "pro" ? "10,000 credits / month" : "3,000 one-time trial credits"}
+              onClick={() => setPlan(p.key, p.label)}
             >
               {p.label}
             </button>
           ))}
-          {current === "custom" && <span className="plan-pill is-custom">Custom mix</span>}
         </div>
       </div>
 
@@ -189,7 +191,7 @@ function ClientRow({
       </div>
 
       <div className="access-section">
-        <span className="access-section-label">Credits this month</span>
+        <span className="access-section-label">{current === "pro" ? "Credits this month" : "Trial credits"}</span>
         <div className="row-between" style={{ marginBottom: 6 }}>
           <span className="panel-sub" style={{ margin: 0 }}>
             {client.credits.remaining} / {client.credits.allowance} remaining
@@ -274,7 +276,7 @@ export default function AccessPage() {
         <div>
           <h2>Client access</h2>
           <p className="page-sub">
-            Give each client a plan — Starter, Growth, or Full access — or tune individual features. Whatever is off disappears from their sidebar; they only see what their subscription includes.
+            Move a client between the free trial and Pro (normally Stripe&rsquo;s job), nudge their credits, or tune individual features. Whatever is off disappears from their sidebar.
           </p>
         </div>
       </div>

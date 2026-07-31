@@ -1,157 +1,171 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useAuth } from "./useAuth";
 import { useFeatureGating } from "./useFeatureGating";
 import { useToast } from "@/components/app/ToastProvider";
-import { getJSON, scopedKey, setJSON } from "@/lib/storage";
+import { createClient } from "@/lib/supabase/client";
 import { CREDIT_COSTS, PLAN_CREDITS, PlanKey } from "@/lib/featureGating";
-
-// `exhaustedMonth` is a sticky lock: once a user hits 0 credits in a
-// given month, it's stamped with that month and stays that way — even
-// if a later signal (another tab's stale write, a corrected server
-// balance) would otherwise put `used` back under the allowance — until
-// the calendar month actually changes. "Used up" should mean used up
-// for the rest of the month, not something that can flicker back.
-type CreditState = { month: string; used: number; exhaustedMonth: string | null };
 
 type CreditsContextValue = {
   creditsLeft: number;
   creditAllowance: number;
+  /** Out of credits (trial pot spent, or pro's monthly allowance used up). */
   creditsExhausted: boolean;
+  /** The 7-day clock ran out on a trial account. */
+  trialExpired: boolean;
+  trialEndsAt: string | null;
+  /** Whole days until the trial ends (0 when expired or on pro). */
+  trialDaysLeft: number;
+  planKey: PlanKey;
+  /** Either lock — what AI feature pages/actions should gate on. */
+  aiLocked: boolean;
   spendCredits: (kind: string, count?: number) => boolean;
   syncCreditsFromServer: (remaining: number) => void;
 };
 
 const CreditsContext = createContext<CreditsContextValue | null>(null);
 
-function thisMonth() {
-  return new Date().toISOString().slice(0, 7);
+// Mirrors _shared/limits.ts's creditsBucketFor(): the trial's 3000
+// credits are one lifetime pot (no monthly reset — a trial spanning a
+// month boundary doesn't get a fresh allowance); pro ledgers per month.
+function bucketFor(plan: PlanKey) {
+  return plan === "pro" ? `credits:${new Date().toISOString().slice(0, 7)}` : "credits:trial";
 }
 
-function freshState(): CreditState {
-  return { month: thisMonth(), used: 0, exhaustedMonth: null };
-}
-
-// Drops usage and the exhausted lock from a snapshot recorded in an
-// earlier month — a new month is a clean slate.
-function normalize(state: CreditState | null): CreditState {
-  if (!state || state.month !== thisMonth()) return freshState();
-  return state;
-}
-
-// Merges two same-month snapshots by taking whichever recorded more
-// spending — reading localStorage fresh and taking the max (rather
-// than just overwriting) is what stops concurrent writers, e.g.
-// another tab, from reverting `used` backward and handing back credits
-// that were already spent. The exhausted lock is sticky across the
-// merge too: if either snapshot already recorded exhaustion this
-// month, the result stays exhausted.
-function merge(a: CreditState, b: CreditState): CreditState {
-  return {
-    month: thisMonth(),
-    used: Math.max(a.used, b.used),
-    exhaustedMonth: a.exhaustedMonth === thisMonth() || b.exhaustedMonth === thisMonth() ? thisMonth() : null,
-  };
-}
-
-// Stamps the sticky lock the first time usage reaches the allowance.
-// Once stamped, callers should stop feeding this function a lower
-// `used` and instead treat the state as locked outright (see
-// syncCreditsFromServer below).
-function withExhaustionCheck(state: CreditState, allowance: number): CreditState {
-  if (state.exhaustedMonth === thisMonth() || state.used < allowance) return state;
-  return { ...state, exhaustedMonth: thisMonth() };
-}
-
-/* Direct replacement for js/app.js's CREDITS section (spendCredits(),
-   creditsLeft(), syncCreditsFromServer()/window.bslSyncCredits — the
-   Edge Functions are the real source of truth; this reconciles the
-   local optimistic counter to match what each AI-action response
-   echoes back). Admins are unmetered. */
+/* The server's usage_counters ledger is the single source of truth now
+   — this reads the signed-in account's own row directly (RLS
+   self-select from migration 0010) and STREAMS spends over realtime,
+   so the balance shown is live across tabs and devices. The old
+   localStorage mirror (sticky monthly locks, cross-tab merge) is gone
+   with the plans it modeled; spendCredits() is only an optimistic
+   pre-check for instant UX, reconciled by the realtime stream and by
+   each Edge Function response echoing `remaining`. Admins are
+   unmetered. */
 export function CreditsProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const { isAdmin, planKey } = useFeatureGating();
+  const { isAdmin, planKey, trialEndsAt } = useFeatureGating();
   const toast = useToast();
-  const email = (user?.email || "").toLowerCase();
-  const creditsKey = scopedKey("bsl_credits", email);
+  const [supabase] = useState(() => createClient());
 
-  const [creditState, setCreditState] = useState<CreditState>(freshState);
-  const creditAllowance = PLAN_CREDITS[planKey as PlanKey] ?? PLAN_CREDITS.custom;
+  const userId = user?.id ?? null;
+  const creditAllowance = PLAN_CREDITS[planKey];
+  const bucket = bucketFor(planKey);
 
-  // `email` isn't known until useAuth's getUser() call resolves, so the
-  // initial state above is a placeholder read under no particular
-  // account. Re-hydrate from this account's real stored usage as soon as
-  // the email is known (and again on account switch), instead of
-  // silently sticking with the placeholder for the rest of the mount.
-  // withExhaustionCheck here matters on its own (not just the merge's
-  // sticky carry-forward): it's what locks a stored `used` that's
-  // already over the allowance but was never run through spendCredits/
-  // syncCreditsFromServer to get stamped — e.g. data from before this
-  // lock existed, or a plan downgrade that dropped the allowance below
-  // what's already been used this month.
-  const hydratedForRef = useRef<string | null>(null);
+  const [used, setUsed] = useState(0);
+
+  // Reset immediately on account switch (state adjusted during render,
+  // same pattern as useFeatureGating) so a previous account's usage
+  // never shows against the next account while its fetch is pending.
+  const [trackedUserId, setTrackedUserId] = useState(userId);
+  if (trackedUserId !== userId) {
+    setTrackedUserId(userId);
+    setUsed(0);
+  }
+
   useEffect(() => {
-    if (!email || hydratedForRef.current === email) return;
-    hydratedForRef.current = email;
-    const stored = getJSON<CreditState>(creditsKey);
-    setCreditState((prev) => {
-      const next = withExhaustionCheck(merge(normalize(prev), normalize(stored)), creditAllowance);
-      setJSON(creditsKey, next);
-      return next;
-    });
-  }, [email, creditsKey, creditAllowance]);
+    if (!userId) return;
+    let cancelled = false;
 
-  const creditsExhausted = !isAdmin && creditState.exhaustedMonth === thisMonth();
-  const creditsLeft = creditsExhausted ? 0 : Math.max(0, creditAllowance - creditState.used);
+    supabase
+      .from("usage_counters")
+      .select("count")
+      .eq("user_id", userId)
+      .eq("bucket", bucket)
+      .maybeSingle()
+      .then(({ data }: { data: { count: number } | null }) => {
+        if (!cancelled) setUsed(data?.count ?? 0);
+      });
+
+    // Unique topic per mount — the singleton client shares one socket,
+    // and same-name channels on it collide (see useFeatureGating).
+    const channel = supabase
+      .channel(`credits-${userId}-${Math.random().toString(36).slice(2)}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "usage_counters", filter: `user_id=eq.${userId}` },
+        (payload: { new: { bucket?: string; count?: number } | null }) => {
+          const row = payload.new;
+          if (row && row.bucket === bucket && typeof row.count === "number") setUsed(row.count);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [userId, bucket, supabase]);
+
+  // Live trial countdown: re-evaluate the expiry comparison the moment
+  // the deadline passes, so the lock engages in the open tab without a
+  // reload (not just on the next fetch).
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    if (planKey === "pro" || !trialEndsAt) return;
+    const msLeft = new Date(trialEndsAt).getTime() - Date.now();
+    if (msLeft <= 0) return;
+    const timer = window.setTimeout(() => setClock(Date.now()), msLeft + 1000);
+    return () => window.clearTimeout(timer);
+  }, [planKey, trialEndsAt]);
+
+  const trialExpired =
+    !isAdmin && planKey !== "pro" && trialEndsAt !== null && new Date(trialEndsAt).getTime() <= clock;
+  const trialDaysLeft =
+    planKey === "pro" || !trialEndsAt
+      ? 0
+      : Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - clock) / 86_400_000));
+
+  const creditsExhausted = !isAdmin && used >= creditAllowance;
+  const creditsLeft = isAdmin ? creditAllowance : Math.max(0, creditAllowance - used);
+  const aiLocked = trialExpired || creditsExhausted;
 
   const spendCredits = useCallback(
     (kind: string, count = 1) => {
       if (isAdmin) return true;
-      const cost = (CREDIT_COSTS[kind] || 0) * count;
-      if (creditsLeft < cost) {
-        toast(`Not enough credits — this needs ${cost} and you have ${creditsLeft}. Credits reset next month, or upgrade your plan.`);
+      if (trialExpired) {
+        toast("Your 7-day free trial has ended — upgrade to Pro to keep going.");
         return false;
       }
-      setCreditState((prev) => {
-        const merged = merge(normalize(prev), normalize(getJSON<CreditState>(creditsKey)));
-        const next = withExhaustionCheck({ ...merged, used: merged.used + cost }, creditAllowance);
-        setJSON(creditsKey, next);
-        return next;
-      });
+      const cost = (CREDIT_COSTS[kind] || 0) * count;
+      if (creditsLeft < cost) {
+        toast(
+          planKey === "pro"
+            ? `Not enough credits — this needs ${cost} and you have ${creditsLeft}. Top up or wait for next month's reset.`
+            : `Not enough trial credits — this needs ${cost} and you have ${creditsLeft}. Upgrade to Pro for more.`
+        );
+        return false;
+      }
+      // Optimistic: the Edge Function's echoed `remaining` and the
+      // realtime stream both reconcile this to the server's number.
+      setUsed((prev) => prev + cost);
       return true;
     },
-    [isAdmin, creditsLeft, creditsKey, creditAllowance, toast]
+    [isAdmin, trialExpired, creditsLeft, planKey, toast]
   );
 
-  // The Edge Function's response is normally authoritative and would
-  // overwrite outright — except once the sticky exhausted lock is set
-  // for this month, in which case it's ignored: "used up" should hold
-  // for the rest of the month even if a later signal (a stale sync, a
-  // corrected server balance) would otherwise suggest credits again.
   const syncCreditsFromServer = useCallback(
     (remaining: number) => {
       if (isAdmin || typeof remaining !== "number") return;
-      setCreditState((prev) => {
-        const current = normalize(prev);
-        if (current.exhaustedMonth === thisMonth()) {
-          setJSON(creditsKey, current);
-          return current;
-        }
-        const next = withExhaustionCheck(
-          { month: thisMonth(), used: Math.max(0, creditAllowance - remaining), exhaustedMonth: null },
-          creditAllowance
-        );
-        setJSON(creditsKey, next);
-        return next;
-      });
+      setUsed(Math.max(0, creditAllowance - remaining));
     },
-    [isAdmin, creditAllowance, creditsKey]
+    [isAdmin, creditAllowance]
   );
 
   const value = useMemo(
-    () => ({ creditsLeft, creditAllowance, creditsExhausted, spendCredits, syncCreditsFromServer }),
-    [creditsLeft, creditAllowance, creditsExhausted, spendCredits, syncCreditsFromServer]
+    () => ({
+      creditsLeft,
+      creditAllowance,
+      creditsExhausted,
+      trialExpired,
+      trialEndsAt,
+      trialDaysLeft,
+      planKey,
+      aiLocked,
+      spendCredits,
+      syncCreditsFromServer,
+    }),
+    [creditsLeft, creditAllowance, creditsExhausted, trialExpired, trialEndsAt, trialDaysLeft, planKey, aiLocked, spendCredits, syncCreditsFromServer]
   );
 
   return <CreditsContext.Provider value={value}>{children}</CreditsContext.Provider>;

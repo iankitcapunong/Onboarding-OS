@@ -59,7 +59,7 @@ function ratioBoxStyle(r: string): React.CSSProperties {
 export default function VideoStudioPage() {
   const { user } = useAuth();
   const { logActivity } = useActivityLog();
-  const { spendCredits, syncCreditsFromServer, creditsExhausted } = useCredits();
+  const { spendCredits, syncCreditsFromServer, aiLocked } = useCredits();
   const toast = useToast();
   const [supabase] = useState(() => createClient());
 
@@ -291,7 +291,7 @@ export default function VideoStudioPage() {
   const m = sel.model;
   const showRefField = !!(m.needsRef || m.allowsRef);
 
-  if (creditsExhausted) return <CreditsLockedPage feature="Video studio" />;
+  if (aiLocked) return <CreditsLockedPage feature="Video studio" />;
 
   return (
     <>

@@ -45,7 +45,7 @@ export function TrialForm() {
   const [termsError, setTermsError] = useState(false);
 
   const [loginAlert, setLoginAlert] = useState(
-    expired ? "Your 7-day trial ended. Log back in to check for an extension, or reach out for full access." : ""
+    expired ? "Your 7-day trial ended. Log back in and upgrade to Pro from the Billing page to keep going." : ""
   );
   const [loginEmailError, setLoginEmailError] = useState(false);
   const [loginPwError, setLoginPwError] = useState(false);
@@ -121,13 +121,12 @@ export function TrialForm() {
 
     if (data.session) {
       try {
-        // Trial accounts get every feature switched on (mirrors PLANS.full)
-        // so warm leads can explore the whole product — seeded server-side
-        // in profiles.features by provision-profile's featuresForPlan().
-        await callProvisionProfile(supabase, "full");
+        // Server-side provisioning: plan 'trial' with trial_ends_at
+        // stamped 7 days out and the one-time 3000-credit pot.
+        await callProvisionProfile(supabase);
       } catch {
         // best-effort backstop, same as the paid signup flow — getPlan()
-        // lazily creates a 'starter' row on first authenticated call
+        // lazily creates a default trial row on first authenticated call
       }
       setSuccess({ name, subText: null });
       setTimeout(() => router.push("/app/agent"), 1400);
@@ -159,7 +158,7 @@ export function TrialForm() {
     }
 
     setBusy(true);
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithPassword({
       email: email.toLowerCase(),
       password,
     });
@@ -171,14 +170,9 @@ export function TrialForm() {
       return;
     }
 
-    const trialEnd = data.user.user_metadata?.trialEnd as string | undefined;
-    if (trialEnd && new Date(trialEnd) <= new Date()) {
-      await supabase.auth.signOut();
-      setBusy(false);
-      setLoginAlert("Your 7-day trial has ended. Reach out to us if you'd like full access.");
-      return;
-    }
-
+    // An expired trial still gets to log IN — the app itself locks AI
+    // features (server-enforced via profiles.trial_ends_at) and routes
+    // them to the Billing page to upgrade to Pro.
     setBusy(false);
     router.push("/app");
     router.refresh();
@@ -258,10 +252,10 @@ export function TrialForm() {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
         </svg>
-        <span>7-day full-access trial · no card, no charge</span>
+        <span>7-day full-access trial · 3,000 credits · no card required</span>
       </span>
       <h1>Start your trial</h1>
-      <p className="auth-sub">You&apos;ve got 7 days of full access. It ends automatically — nothing to cancel.</p>
+      <p className="auth-sub">You&apos;ve got 7 days and 3,000 credits of full access. When it ends, upgrade to Pro to keep going — nothing is charged automatically.</p>
 
       <FormAlert message={startAlert} />
 

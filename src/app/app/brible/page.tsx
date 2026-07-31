@@ -20,18 +20,18 @@ import { CreditsLockedPage } from "@/components/app/CreditsLockedPage";
    src/styles/app.css). */
 export default function BriblePage() {
   const { versions } = useBrible();
-  const { creditsExhausted } = useCredits();
+  const { aiLocked } = useCredits();
   const [view, setView] = useState<"home" | "builder">(() => (versions.length ? "builder" : "home"));
 
   useEffect(() => {
-    if (creditsExhausted) return;
+    if (aiLocked) return;
     document.body.classList.add("brible-active");
     return () => {
       document.body.classList.remove("brible-active");
     };
-  }, [creditsExhausted]);
+  }, [aiLocked]);
 
-  if (creditsExhausted) return <CreditsLockedPage feature="Brible websites" />;
+  if (aiLocked) return <CreditsLockedPage feature="Brible websites" />;
 
   return (
     <div className="brible-shell">

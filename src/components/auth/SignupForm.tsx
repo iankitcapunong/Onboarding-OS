@@ -1,27 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { callProvisionProfile } from "@/lib/edgeFunctions";
-import { getJSON } from "@/lib/storage";
+import { PLAN_CREDITS, TRIAL_DAYS } from "@/lib/featureGating";
 import { FormAlert } from "./FormAlert";
 import { PasswordField } from "./PasswordField";
-
-type Order = {
-  status: string;
-  trialEnd?: string;
-  amount: number;
-};
-
-const ADDON_KEYS = ["brible", "creative", "images", "videos"] as const;
-const DEFAULT_FEATURE_KEYS = ["agent", "assistants", "logs", "tools", "integrations", "calls", "onboarding", "assets"] as const;
-const PLAN_FEATURES: Record<string, readonly string[]> = {
-  starter: ["agent", "assistants", "logs", "calls", "assets"],
-  growth: ["agent", "assistants", "logs", "tools", "integrations", "calls", "assets", "brible", "creative"],
-  full: [...DEFAULT_FEATURE_KEYS, ...ADDON_KEYS],
-};
 
 function validEmail(v: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
@@ -29,27 +15,6 @@ function validEmail(v: string) {
 
 function loginUrl() {
   return `${window.location.origin}/login`;
-}
-
-/* Derives the plan label from the selected add-ons — the actual
-   feature-gate flags for this plan get seeded server-side by
-   provision-profile (see supabase/functions/provision-profile/index.ts's
-   featuresForPlan(), mirroring PLAN_FEATURES below) once provisionProfile()
-   is called with this returned plan. */
-function provisionFeatures(addons: string[]): string {
-  const flags: Record<string, boolean> = {};
-  [...DEFAULT_FEATURE_KEYS, ...ADDON_KEYS].forEach((k) => {
-    flags[k] = (DEFAULT_FEATURE_KEYS as readonly string[]).includes(k) || addons.includes(k);
-  });
-  let plan = "custom";
-  for (const [p, feats] of Object.entries(PLAN_FEATURES)) {
-    const matches = Object.keys(flags).every((k) => flags[k] === feats.includes(k));
-    if (matches) {
-      plan = p;
-      break;
-    }
-  }
-  return plan;
 }
 
 function passwordScore(v: string) {
@@ -63,14 +28,11 @@ function passwordScore(v: string) {
 
 export function SignupForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [supabase] = useState(() => createClient());
 
-  const [planStripText, setPlanStripText] = useState("");
   const [alert, setAlert] = useState("");
   const [busy, setBusy] = useState(false);
   const [pwScore, setPwScore] = useState(0);
-  const [addons, setAddons] = useState<string[]>([]);
 
   const [nameError, setNameError] = useState(false);
   const [emailError, setEmailError] = useState(false);
@@ -84,37 +46,13 @@ export function SignupForm() {
   const passwordRef = useRef<HTMLInputElement>(null);
   const termsRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    // Reads localStorage, which only exists post-hydration — must run in
-    // an effect rather than during render to avoid an SSR/CSR mismatch.
-    if (searchParams.get("plan") !== "pro") return;
-    const order = getJSON<Order>("bsl_order");
-    if (order && order.status === "trialing" && order.trialEnd) {
-      const label = new Date(order.trialEnd).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setPlanStripText(`Onboarding OS Pro · free until ${label}, then $${order.amount}/month`);
-    } else {
-      setPlanStripText("Onboarding OS Pro · 7-day free trial started");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function toggleAddon(key: string, checked: boolean) {
-    setAddons((prev) => (checked ? [...prev, key] : prev.filter((k) => k !== key)));
-  }
-
-  async function provisionProfile(plan: string) {
+  async function provisionProfile() {
     try {
-      await callProvisionProfile(supabase, plan);
+      await callProvisionProfile(supabase);
     } catch {
       // best-effort backstop — getPlan() in the Edge Functions lazily
-      // creates a 'starter' row on first authenticated call too, so a
-      // failure here just means the account starts on starter instead
-      // of its chosen plan rather than being fully unprovisioned
+      // creates a default trial row on first authenticated call too,
+      // so a failure here doesn't leave the account unprovisioned
     }
   }
 
@@ -164,10 +102,8 @@ export function SignupForm() {
       return;
     }
 
-    const plan = provisionFeatures(addons);
-
     if (data.session) {
-      await provisionProfile(plan);
+      await provisionProfile();
       setSuccess({ name, subText: null });
       setTimeout(() => router.push("/app/agent"), 1400);
     } else {
@@ -201,14 +137,12 @@ export function SignupForm() {
       <h1>Create your account</h1>
       <p className="auth-sub">Start onboarding clients on autopilot in under 10 minutes.</p>
 
-      {planStripText && (
-        <div className="plan-strip">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-          </svg>
-          <span>{planStripText}</span>
-        </div>
-      )}
+      <div className="plan-strip">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+        </svg>
+        <span>{TRIAL_DAYS}-day free trial · {PLAN_CREDITS.trial.toLocaleString()} credits included · no card required</span>
+      </div>
 
       <FormAlert message={alert} />
 
@@ -278,44 +212,10 @@ export function SignupForm() {
           <p className={`field-error${pwError ? " visible" : ""}`} role="alert">Password must be at least 8 characters.</p>
         </div>
 
-        <fieldset className="addon-picker">
-          <legend>
-            What do you need? <span className="hint-inline">(Onboarding, playground &amp; assets included in every account)</span>
-          </legend>
-          <label className="addon-option">
-            <input type="checkbox" name="addon" value="brible" onChange={(e) => toggleAddon("brible", e.currentTarget.checked)} />
-            <span className="addon-label">
-              <strong>Funnel &amp; website generator</strong>
-              <small>AI-built landing pages for your clients</small>
-            </span>
-          </label>
-          <label className="addon-option">
-            <input type="checkbox" name="addon" value="creative" onChange={(e) => toggleAddon("creative", e.currentTarget.checked)} />
-            <span className="addon-label">
-              <strong>Ad creatives</strong>
-              <small>On-brand ad graphics, generated for you</small>
-            </span>
-          </label>
-          <label className="addon-option">
-            <input type="checkbox" name="addon" value="images" onChange={(e) => toggleAddon("images", e.currentTarget.checked)} />
-            <span className="addon-label">
-              <strong>Image generation</strong>
-              <small>Standalone AI image studio</small>
-            </span>
-          </label>
-          <label className="addon-option">
-            <input type="checkbox" name="addon" value="videos" onChange={(e) => toggleAddon("videos", e.currentTarget.checked)} />
-            <span className="addon-label">
-              <strong>Video generation</strong>
-              <small>Standalone AI video studio</small>
-            </span>
-          </label>
-        </fieldset>
-
         <label className="tc-check" htmlFor="suTerms">
           <input type="checkbox" id="suTerms" name="terms" ref={termsRef} required aria-invalid={termsError} onChange={() => setTermsError(false)} />
           <span>
-            I agree to the <Link href="/terms" target="_blank" rel="noopener">Terms &amp; Conditions</Link> and <Link href="/privacy" target="_blank" rel="noopener">Privacy Policy</Link>, including the 7-day trial auto-charge described at checkout.
+            I agree to the <Link href="/terms" target="_blank" rel="noopener">Terms &amp; Conditions</Link> and <Link href="/privacy" target="_blank" rel="noopener">Privacy Policy</Link>.
           </span>
         </label>
         <p className={`field-error${termsError ? " visible" : ""}`} role="alert">Please agree to the Terms &amp; Conditions to continue.</p>

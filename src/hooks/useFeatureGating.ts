@@ -1,22 +1,32 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "./useAuth";
 import { createClient } from "@/lib/supabase/client";
-import { ADMIN_EMAILS, FEATURES, FeatureKey, LEGACY_FEATURE_ALIASES, PlanKey, planLabel } from "@/lib/featureGating";
+import { ADMIN_EMAILS, FEATURES, FeatureKey, LEGACY_FEATURE_ALIASES, PlanKey, normalizePlan, planLabel } from "@/lib/featureGating";
 
-type RemoteAccess = { plan: PlanKey; features: Partial<Record<FeatureKey, boolean>> | null };
+type RemoteAccess = {
+  plan: PlanKey;
+  features: Partial<Record<FeatureKey, boolean>> | null;
+  trialEndsAt: string | null;
+};
 
 /* Direct replacement for js/app.js's FEATURE GATING section (IS_ADMIN,
-   featureOn(), myFeatures) — now reading each account's own real
-   `profiles.plan`/`profiles.features` row from Supabase instead of
-   localStorage, since an admin's local toggles never reached a real
-   client's own device (see src/app/app/access/page.tsx). */
+   featureOn(), myFeatures) — reading each account's own real
+   `profiles` row from Supabase, and now also STREAMING it: migration
+   0010 put profiles in the realtime publication, so the moment
+   stripe-webhook flips this account to 'pro' (or an admin toggles a
+   feature) the change lands here live, no refresh or polling. */
 export function useFeatureGating() {
   const { user } = useAuth();
   const email = (user?.email || "").toLowerCase();
   const userId = user?.id ?? null;
   const [supabase] = useState(() => createClient());
+  // The browser client is a singleton sharing one realtime socket, and
+  // this hook mounts in several components at once — same-name channels
+  // on one socket collide (a later join closes the earlier one), so
+  // each hook instance subscribes under its own unique topic.
+  const [channelId] = useState(() => Math.random().toString(36).slice(2));
   const [remote, setRemote] = useState<RemoteAccess | null>(null);
 
   // Reset immediately (adjusting state during render, not via an effect
@@ -30,25 +40,50 @@ export function useFeatureGating() {
   }
 
   // `userId` isn't known until useAuth's getUser() call resolves — fetch
-  // this account's real profiles row as soon as it's known, once per
-  // account.
-  const fetchedForRef = useRef<string | null>(null);
+  // this account's real profiles row as soon as it's known, then keep it
+  // fresh via the realtime stream on that same row.
   useEffect(() => {
-    if (!userId || fetchedForRef.current === userId) return;
-    fetchedForRef.current = userId;
+    if (!userId) return;
+    let cancelled = false;
+
+    function apply(row: { plan?: string | null; features?: Partial<Record<FeatureKey, boolean>> | null; trial_ends_at?: string | null } | null) {
+      setRemote({
+        plan: normalizePlan(row?.plan),
+        features: row?.features ?? null,
+        trialEndsAt: row?.trial_ends_at ?? null,
+      });
+    }
+
     supabase
       .from("profiles")
-      .select("plan, features")
+      .select("plan, features, trial_ends_at")
       .eq("user_id", userId)
       .maybeSingle()
       .then(({ data }) => {
-        setRemote({ plan: (data?.plan as PlanKey) ?? "starter", features: data?.features ?? null });
+        if (!cancelled) apply(data);
       });
-  }, [userId, supabase]);
+
+    const channel = supabase
+      .channel(`profile-${userId}-${channelId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "profiles", filter: `user_id=eq.${userId}` },
+        (payload) => {
+          if (payload.new && typeof payload.new === "object") apply(payload.new as Parameters<typeof apply>[0]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [userId, supabase, channelId]);
 
   return useMemo(() => {
     const isAdmin = ADMIN_EMAILS.includes(email);
-    const planKey: PlanKey = remote?.plan ?? "starter";
+    const planKey: PlanKey = remote?.plan ?? "trial";
+    const trialEndsAt = remote?.trialEndsAt ?? null;
     // null (including still-loading, before the fetch above resolves)
     // means no override — full access, matching the prior default.
     const overrides = remote?.features ?? null;
@@ -83,6 +118,6 @@ export function useFeatureGating() {
     // guards must wait for it — before that, featureOn optimistically
     // answers true ("no override = full access") and a redirect decision
     // taken then would bounce users off pages they're allowed on.
-    return { isAdmin, myFeatures, planKey, planLabel: planLabel(planKey), featureOn, loaded: remote !== null };
+    return { isAdmin, myFeatures, planKey, planLabel: planLabel(planKey), trialEndsAt, featureOn, loaded: remote !== null };
   }, [email, remote]);
 }

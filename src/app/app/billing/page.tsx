@@ -1,20 +1,21 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth";
 import { useFeatureGating } from "@/hooks/useFeatureGating";
 import { useCredits } from "@/hooks/useCredits";
 import { useToast } from "@/components/app/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
 import { callStripeCheckout } from "@/lib/edgeFunctions";
-import { PLANS, PLAN_CREDITS, planLabel, PlanKey } from "@/lib/featureGating";
+import { PLAN_CREDITS } from "@/lib/featureGating";
 
-const PLAN_BLURBS: Record<string, string> = {
-  starter: "The core onboarding agent — build, publish, and review conversations.",
-  growth: "Adds tools, integrations, and the creative suite for growing teams.",
-  full: "Everything switched on, including image and video studios.",
-};
+const PRO_FEATURES = [
+  "Everything unlocked — agent, assistants, tools, integrations",
+  "Website builder, creative ads, image & video studios",
+  `${PLAN_CREDITS.pro.toLocaleString()} credits every month`,
+  "Credit top-ups whenever you need more",
+  "Cancel anytime from the billing portal",
+];
 
 const TOPUPS: { pack: "small" | "large"; credits: number; label: string }[] = [
   { pack: "small", credits: 250, label: "Small top-up" },
@@ -31,39 +32,15 @@ export default function BillingPage() {
 }
 
 function BillingContent() {
-  const { user } = useAuth();
-  const { planKey, isAdmin } = useFeatureGating();
-  const { creditsLeft, creditAllowance } = useCredits();
+  const { isAdmin } = useFeatureGating();
+  const { planKey, trialDaysLeft, trialExpired, creditsLeft, creditAllowance } = useCredits();
   const toast = useToast();
   const searchParams = useSearchParams();
   const [supabase] = useState(() => createClient());
   const [busy, setBusy] = useState<string | null>(null);
-  const [livePlan, setLivePlan] = useState<PlanKey | null>(null);
-  const polled = useRef(false);
 
   const status = searchParams.get("status");
-
-  // Coming back from a successful Checkout: the webhook is the source
-  // of truth and may land a beat after the redirect — poll the profile
-  // briefly instead of showing a stale plan.
-  useEffect(() => {
-    if (status !== "success" || !user || polled.current) return;
-    polled.current = true;
-    let attempts = 0;
-    const timer = window.setInterval(async () => {
-      attempts += 1;
-      const { data } = await supabase
-        .from("profiles")
-        .select("plan")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (data?.plan) setLivePlan(data.plan as PlanKey);
-      if (attempts >= 5) window.clearInterval(timer);
-    }, 2000);
-    return () => window.clearInterval(timer);
-  }, [status, user, supabase]);
-
-  const currentPlan = livePlan ?? planKey;
+  const isPro = planKey === "pro";
 
   async function go(payload: Parameters<typeof callStripeCheckout>[1], key: string) {
     setBusy(key);
@@ -76,14 +53,18 @@ function BillingContent() {
     }
   }
 
+  const trialStatus = trialExpired
+    ? "Free trial · ended — upgrade to Pro to keep using AI features"
+    : `Free trial · ${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} left · ${creditsLeft} of ${creditAllowance} credits remaining`;
+
   return (
     <>
       <div className="page-head">
         <div>
           <h2>Billing</h2>
           <p className="page-sub">
-            Manage your subscription and credits. Payments run through Stripe&rsquo;s secure checkout —
-            we never see your card.
+            Every account starts with a 7-day free trial and {PLAN_CREDITS.trial.toLocaleString()} credits.
+            Payments run through Stripe&rsquo;s secure checkout — we never see your card.
           </p>
         </div>
       </div>
@@ -92,7 +73,8 @@ function BillingContent() {
         <div className="panel" style={{ marginBottom: 14, borderColor: "var(--primary)" }}>
           <h3>Payment confirmed</h3>
           <p className="panel-sub">
-            Stripe has confirmed your payment — your plan and credits update here within a few seconds.
+            Stripe has confirmed your payment — your account updates here the moment the webhook lands,
+            usually within a few seconds.
           </p>
         </div>
       )}
@@ -102,14 +84,16 @@ function BillingContent() {
         </div>
       )}
 
-      <div className="panel" style={{ marginBottom: 14 }}>
+      <div className="panel" style={{ marginBottom: 14, ...(trialExpired && !isAdmin ? { borderColor: "var(--primary)" } : {}) }}>
         <h3>Current plan</h3>
         <p className="panel-sub" style={{ marginTop: 4 }}>
           {isAdmin
             ? "Admin — unlimited, nothing to manage here."
-            : `${planLabel(currentPlan)} · ${creditsLeft} of ${creditAllowance} credits left this month`}
+            : isPro
+              ? `Pro · ${creditsLeft} of ${creditAllowance} credits left this month`
+              : trialStatus}
         </p>
-        {!isAdmin && (
+        {!isAdmin && isPro && (
           <button
             type="button"
             className="btn btn-secondary btn-sm"
@@ -122,73 +106,55 @@ function BillingContent() {
         )}
       </div>
 
-      {!isAdmin && (
-        <>
-          <div className="panel" style={{ marginBottom: 14 }}>
-            <h3>Plans</h3>
-            <p className="panel-sub">7-day free trial on every plan — cancel before it ends and you pay nothing. Prices shown at Stripe checkout.</p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 12, marginTop: 12 }}>
-              {PLANS.map((p) => {
-                const isCurrent = currentPlan === p.key;
-                return (
-                  <div
-                    key={p.key}
-                    style={{
-                      border: `1px solid ${isCurrent ? "var(--primary)" : "var(--border)"}`,
-                      borderRadius: 10,
-                      padding: 16,
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 8,
-                    }}
-                  >
-                    <strong style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {p.label}
-                      {isCurrent && <span className="side-badge">Current</span>}
-                    </strong>
-                    <p className="panel-sub" style={{ margin: 0, fontSize: 13.5 }}>{PLAN_BLURBS[p.key]}</p>
-                    <p className="panel-sub" style={{ margin: 0, fontSize: 13.5 }}>
-                      {PLAN_CREDITS[p.key]} credits / month
-                    </p>
-                    <button
-                      type="button"
-                      className={`btn ${isCurrent ? "btn-secondary" : "btn-primary"} btn-sm`}
-                      style={{ marginTop: "auto" }}
-                      onClick={() => go({ action: "subscribe", plan: p.key }, `plan-${p.key}`)}
-                      disabled={busy !== null || isCurrent}
-                    >
-                      {busy === `plan-${p.key}` ? "Opening…" : isCurrent ? "Your plan" : "Choose plan"}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+      {!isAdmin && !isPro && (
+        <div className="panel" style={{ marginBottom: 14 }}>
+          <h3>Upgrade to Pro</h3>
+          <p className="panel-sub">
+            {trialExpired
+              ? "Your trial has ended — Pro picks up right where it left off."
+              : "Keep everything after your trial ends. Price shown at Stripe checkout."}
+          </p>
+          <ul className="panel-sub" style={{ margin: "12px 0 0 18px", display: "grid", gap: 6 }}>
+            {PRO_FEATURES.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ marginTop: 14 }}
+            onClick={() => go({ action: "subscribe" }, "subscribe")}
+            disabled={busy !== null}
+          >
+            {busy === "subscribe" ? "Opening…" : "Upgrade to Pro"}
+          </button>
+        </div>
+      )}
 
-          <div className="panel">
-            <h3>Credit top-ups</h3>
-            <p className="panel-sub">
-              Pay-as-you-go: one-time packs added to this month&rsquo;s balance the moment Stripe confirms
-              payment.
-            </p>
-            <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
-              {TOPUPS.map((t) => (
-                <button
-                  key={t.pack}
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => go({ action: "topup", pack: t.pack }, `topup-${t.pack}`)}
-                  disabled={busy !== null}
-                >
-                  {busy === `topup-${t.pack}` ? "Opening…" : `${t.label} · +${t.credits} credits`}
-                </button>
-              ))}
-            </div>
-            <p className="hint" style={{ marginTop: 10 }}>
-              Top-ups apply to the current month&rsquo;s balance and don&rsquo;t roll over.
-            </p>
+      {!isAdmin && isPro && (
+        <div className="panel">
+          <h3>Credit top-ups</h3>
+          <p className="panel-sub">
+            Pay-as-you-go: one-time packs added to this month&rsquo;s balance the moment Stripe confirms
+            payment.
+          </p>
+          <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+            {TOPUPS.map((t) => (
+              <button
+                key={t.pack}
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => go({ action: "topup", pack: t.pack }, `topup-${t.pack}`)}
+                disabled={busy !== null}
+              >
+                {busy === `topup-${t.pack}` ? "Opening…" : `${t.label} · +${t.credits} credits`}
+              </button>
+            ))}
           </div>
-        </>
+          <p className="hint" style={{ marginTop: 10 }}>
+            Top-ups apply to the current month&rsquo;s balance and don&rsquo;t roll over.
+          </p>
+        </div>
       )}
     </>
   );
