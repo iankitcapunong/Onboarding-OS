@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/app/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
+import { errorMessage } from "@/lib/assistantTemplate";
 
 type PublishedAssistant = {
   slug: string;
@@ -67,6 +68,27 @@ export default function IntegrationsPage() {
     toast(`${label} copied`, true);
   }
 
+  // Unpublishes the assistant: deletes its deployment row, so the public
+  // link (and any embeds using it) stop working immediately. The draft
+  // survives — re-publishing from the editor mints a new link.
+  async function handleRemove(p: PublishedAssistant) {
+    const ok = confirm(
+      `Remove the chat link for "${p.name}"? /talk/${p.slug} and any embeds of it stop working immediately. The assistant itself is kept — publishing again creates a new link.`
+    );
+    if (!ok) return;
+    try {
+      const { error } = await supabase
+        .from("agent_deployments")
+        .delete()
+        .eq("assistant_id", p.assistant_id);
+      if (error) throw error;
+      setPublished((prev) => (prev ?? []).filter((x) => x.assistant_id !== p.assistant_id));
+      toast("Chat link removed", true);
+    } catch (err) {
+      toast(errorMessage(err, "Couldn't remove the link"));
+    }
+  }
+
   return (
     <>
       <div className="page-head">
@@ -95,13 +117,16 @@ export default function IntegrationsPage() {
             return (
               <div key={p.slug} style={{ padding: "14px 0", borderTop: "1px solid var(--border)" }}>
                 <strong>{p.name}</strong>
-                <div className="field" style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                  <input className="input" readOnly value={link} onFocus={(e) => e.currentTarget.select()} />
+                <div className="field" style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                  <input className="input" readOnly value={link} onFocus={(e) => e.currentTarget.select()} style={{ flex: 1, minWidth: 220 }} />
                   <button type="button" className="btn btn-secondary" onClick={() => copy(link, "Link")}>
                     Copy link
                   </button>
                   <button type="button" className="btn btn-secondary" onClick={() => copy(embed, "Embed code")}>
                     Copy embed
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={() => handleRemove(p)}>
+                    Remove
                   </button>
                 </div>
                 <p className="hint" style={{ marginTop: 6 }}>
