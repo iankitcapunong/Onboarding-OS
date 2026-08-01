@@ -28,9 +28,10 @@ const iconBoxStyle = {
   justifyContent: "center",
   width: 34,
   height: 34,
-  borderRadius: 10,
+  borderRadius: 11,
   background: "linear-gradient(135deg,var(--primary),var(--accent))",
-  color: "#fff",
+  color: "var(--primary-ink)",
+  boxShadow: "0 4px 14px rgba(205, 244, 99, 0.25)",
 } as const;
 
 export function AuthBrandIcon() {

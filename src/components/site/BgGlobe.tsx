@@ -137,8 +137,8 @@ export function BgGlobe() {
       uDistortion: { value: 0.9 },
       uSize: { value: 2.4 },
       uDetail: { value: 0.8 },
-      uColor: { value: new THREE.Color(0xfafafa) },
-      uOpacity: { value: 0.8 },
+      uColor: { value: new THREE.Color(0xdcf784) },
+      uOpacity: { value: 0.5 },
       uMouse: { value: new THREE.Vector2(0, 0) },
     };
 

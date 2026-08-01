@@ -49,7 +49,7 @@ export default function HomePage() {
               AI-powered client onboarding
             </span>
             <h1>
-              Still losing 6+ hours onboarding<br className="br-desktop" /> every new client by hand?
+              Still losing <span className="hl">6+ hours</span> onboarding<br className="br-desktop" /> every new client by hand?
             </h1>
             <p className="hero-sub">
               Onboarding OS interviews your clients, captures every detail, and generates your email copy, ad copy, and landing page copy. Automatically, in minutes.

@@ -74,28 +74,28 @@ export function SessionsChart({ data }: { data: SessionsChartPoint[] }) {
         >
           {yTicks.map((t) => (
             <g key={t}>
-              <line x1={m.left} y1={y(t)} x2={width - m.right} y2={y(t)} stroke="#eef2f6" strokeWidth={1} />
-              <text x={m.left - 9} y={y(t) + 4} textAnchor="end" fontSize={11} fill="#94a3b8" fontFamily="Inter, sans-serif">
+              <line x1={m.left} y1={y(t)} x2={width - m.right} y2={y(t)} stroke="rgba(236,244,214,0.08)" strokeWidth={1} />
+              <text x={m.left - 9} y={y(t) + 4} textAnchor="end" fontSize={11} fill="#808875" fontFamily="Inter, sans-serif">
                 {t}
               </text>
             </g>
           ))}
           {[0, 7, 14, 21, 29].map((i) => (
-            <text key={i} x={x(i)} y={H - 8} textAnchor="middle" fontSize={11} fill="#94a3b8" fontFamily="Inter, sans-serif">
+            <text key={i} x={x(i)} y={H - 8} textAnchor="middle" fontSize={11} fill="#808875" fontFamily="Inter, sans-serif">
               {fmtDate(data[i].date)}
             </text>
           ))}
-          <line x1={m.left} y1={y(0)} x2={width - m.right} y2={y(0)} stroke="#e2e8f0" strokeWidth={1} />
-          <path d={areaD} fill="rgba(79,70,229,0.1)" />
-          <path d={lineD} fill="none" stroke="#4f46e5" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx={x(n - 1)} cy={y(last.value)} r={4.5} fill="#4f46e5" stroke="#ffffff" strokeWidth={2} />
-          <text x={x(n - 1) + 10} y={y(last.value) + 4} fontSize={12} fontWeight={600} fill="#0f172a" fontFamily="Inter, sans-serif">
+          <line x1={m.left} y1={y(0)} x2={width - m.right} y2={y(0)} stroke="rgba(236,244,214,0.16)" strokeWidth={1} />
+          <path d={areaD} fill="rgba(205,244,99,0.12)" />
+          <path d={lineD} fill="none" stroke="#cdf463" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx={x(n - 1)} cy={y(last.value)} r={4.5} fill="#cdf463" stroke="#0a0b08" strokeWidth={2} />
+          <text x={x(n - 1) + 10} y={y(last.value) + 4} fontSize={12} fontWeight={600} fill="#f2f5ec" fontFamily="Inter, sans-serif">
             {last.value}
           </text>
           {hover && (
             <>
-              <line x1={hoverX} y1={m.top} x2={hoverX} y2={m.top + ih} stroke="#cbd5e1" strokeWidth={1} />
-              <circle cx={hoverX} cy={hoverY} r={4.5} fill="#4f46e5" stroke="#ffffff" strokeWidth={2} />
+              <line x1={hoverX} y1={m.top} x2={hoverX} y2={m.top + ih} stroke="rgba(236,244,214,0.28)" strokeWidth={1} />
+              <circle cx={hoverX} cy={hoverY} r={4.5} fill="#cdf463" stroke="#0a0b08" strokeWidth={2} />
             </>
           )}
           <rect x={m.left} y={m.top} width={iw} height={ih} fill="transparent" />

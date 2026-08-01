@@ -41,7 +41,7 @@ export default function DemoPage() {
               See it in action
             </span>
             <h1>
-              Watch Onboarding OS run<br className="br-desktop" /> a real client onboarding.
+              Watch Onboarding OS run<br className="br-desktop" /> a <span className="hl">real client onboarding</span>.
             </h1>
             <p className="hero-sub">
               One recording, three to five real business use cases — the onboarding interview, the dashboard it fills in, and the assets it generates. No sales call required to see it work.

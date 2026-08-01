@@ -18,9 +18,9 @@ export function Sparkline({ data }: { data: number[] }) {
 
   return (
     <svg className="tile-spark" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true">
-      <path d={area} fill="rgba(79,70,229,0.1)" />
-      <path d={line} fill="none" stroke="#4f46e5" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={end[0]} cy={end[1]} r={3.2} fill="#4f46e5" stroke="#ffffff" strokeWidth={2} />
+      <path d={area} fill="rgba(205,244,99,0.12)" />
+      <path d={line} fill="none" stroke="#cdf463" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={end[0]} cy={end[1]} r={3.2} fill="#cdf463" stroke="#0a0b08" strokeWidth={2} />
     </svg>
   );
 }

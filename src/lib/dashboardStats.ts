@@ -81,9 +81,9 @@ export function computeFunnel(logs: CallLog[], assets: Asset[]): FunnelStage[] {
     return key && assetKeys.has(key);
   }).length;
   return [
-    { label: "Sessions started", value: started, color: "#3730a3" },
-    { label: "Interview completed", value: completed, color: "#4f46e5" },
-    { label: "Assets generated", value: withAssets, color: "#818cf8" },
+    { label: "Sessions started", value: started, color: "#86a534" },
+    { label: "Interview completed", value: completed, color: "#aed13f" },
+    { label: "Assets generated", value: withAssets, color: "#cdf463" },
   ];
 }
 
