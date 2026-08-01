@@ -68,6 +68,7 @@ export default function TalkPage() {
   const [sending, setSending] = useState(false);
   const [ended, setEnded] = useState(false);
   const [fatalError, setFatalError] = useState<string | null>(null);
+  const [agentName, setAgentName] = useState<string | null>(null);
 
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
@@ -99,6 +100,53 @@ export default function TalkPage() {
       recognitionRef.current?.abort();
       window.speechSynthesis?.cancel();
     };
+  }, [slug]);
+
+  // Fetch the assistant's display name + configured opening line and
+  // seed the greeting, so the conversation starts the way its owner
+  // wrote it. Best-effort: on any failure the page just keeps the
+  // generic header and waits for the visitor to open.
+  useEffect(() => {
+    let cancelled = false;
+    callAgentTalk<{ name: string; firstMessage: string }>({ slug, action: "init" })
+      .then(({ name, firstMessage }) => {
+        if (cancelled) return;
+        if (name) setAgentName(name);
+        const greeting = (firstMessage ?? "").trim();
+        if (greeting) {
+          setMessages((prev) => (prev.length === 0 ? [{ role: "assistant", content: greeting }] : prev));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+
+  // A closed/abandoned tab must still deliver the conversation to the
+  // owner's CRM — "End chat" is a courtesy, not the only trigger.
+  // sendBeacon survives page teardown; text/plain keeps it a simple
+  // request (beacons can't preflight), and agent-talk parses the body
+  // as JSON regardless of content-type.
+  useEffect(() => {
+    function onPageHide() {
+      if (endedRef.current) return;
+      if (!messagesRef.current.some((m) => m.role === "user")) return;
+      endedRef.current = true;
+      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/agent-talk`;
+      const payload = JSON.stringify({ slug, action: "end", sessionId: sessionIdRef.current ?? undefined });
+      const sent = navigator.sendBeacon?.(url, new Blob([payload], { type: "text/plain;charset=UTF-8" }));
+      if (!sent) {
+        fetch(url, {
+          method: "POST",
+          body: payload,
+          keepalive: true,
+          headers: { "Content-Type": "text/plain;charset=UTF-8" },
+        }).catch(() => {});
+      }
+    }
+    window.addEventListener("pagehide", onPageHide);
+    return () => window.removeEventListener("pagehide", onPageHide);
   }, [slug]);
 
   function scrollToBottom() {
@@ -257,7 +305,9 @@ export default function TalkPage() {
   }
 
   async function handleEnd() {
-    if (ended || messages.length === 0) return;
+    // The seeded greeting alone isn't a conversation — only end (and
+    // dispatch) once the visitor actually said something.
+    if (ended || !messages.some((m) => m.role === "user")) return;
     endedRef.current = true;
     setEnded(true);
     exitVoiceMode();
@@ -292,13 +342,13 @@ export default function TalkPage() {
     <div style={{ maxWidth: 640, margin: "0 auto", padding: "32px 20px", minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
       <div style={{ marginBottom: 16, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
         <div>
-          <span className="pp-label">Onboarding</span>
+          <span className="pp-label">{agentName ?? "Onboarding"}</span>
           <h1 style={{ margin: "4px 0 0", fontSize: 22 }}>Let&apos;s get you set up</h1>
           <p className="panel-sub" style={{ marginTop: 4 }}>
             {voiceMode ? "Talk it through — hands-free." : "Answer a few questions and we'll take it from here."}
           </p>
         </div>
-        {messages.length > 0 && !ended && (
+        {messages.some((m) => m.role === "user") && !ended && (
           <button type="button" className="btn btn-secondary btn-sm" onClick={handleEnd}>
             End chat
           </button>

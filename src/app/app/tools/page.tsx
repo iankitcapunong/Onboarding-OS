@@ -24,9 +24,13 @@ const EXAMPLE_PAYLOAD = `{
   "sessionId": "…",
   "slug": "…",
   "assistantId": "…",
+  "assistantName": "Onboarding agent",
   "startedAt": "2026-07-30T12:00:00Z",
   "endedAt": "2026-07-30T12:06:40Z",
   "messageCount": 12,
+  "contact": { "name": "…", "email": "…", "phone": "…", "company": "…" },
+  "answers": { "business": "…", "main_offer": "…", "location": "…" },
+  "summary": "2-3 plain sentences about who this is and what they want.",
   "transcript": [
     { "role": "assistant", "content": "…", "created_at": "…" },
     { "role": "user", "content": "…", "created_at": "…" }
@@ -68,6 +72,9 @@ export default function ToolsPage() {
     supabase
       .from("assistant_tools")
       .select("id, assistant_id, type, name, config, enabled, created_at")
+      // Native destinations (zapier/ghl/sheets) share this table but are
+      // managed on the Integrations tab — this page is webhooks only.
+      .eq("type", "webhook")
       .order("created_at", { ascending: true })
       .then(({ data, error }) => {
         if (cancelled) return;
@@ -121,7 +128,12 @@ export default function ToolsPage() {
       setScope("all");
       toast("Webhook added", true);
     } catch (err) {
-      toast(errorMessage(err, "Couldn't add the webhook"));
+      const message = errorMessage(err, "Couldn't add the webhook");
+      toast(
+        message.includes("tool_limit_reached")
+          ? "You've reached the 20-destination limit — remove one you no longer use first."
+          : message
+      );
     } finally {
       setBusy(false);
     }
@@ -161,8 +173,9 @@ export default function ToolsPage() {
         <div>
           <h2>Tools</h2>
           <p className="page-sub">
-            Connect your own systems. When an onboarding chat ends, we POST the full transcript to your
-            webhook — point it at Zapier, n8n, or your own endpoint.
+            Connect your own systems. When an onboarding chat ends, we POST the extracted contact,
+            answers, and full transcript to your webhook — point it at n8n or your own endpoint.
+            Native GoHighLevel, Google Sheets, and Zapier live on the Integrations tab.
           </p>
         </div>
         <button type="button" className="btn btn-primary" onClick={() => setFormOpen((v) => !v)}>

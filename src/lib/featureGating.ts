@@ -95,3 +95,11 @@ export const CREDIT_COSTS: Record<string, number> = {
 export function planLabel(key: PlanKey | null) {
   return key === "pro" ? "Pro" : "Free trial";
 }
+
+/* Per-tier assistant-creation caps. The ENFORCED copy is the
+   enforce_assistant_limit() DB trigger (supabase migration 0011) —
+   assistants are inserted straight from the browser under RLS, so only
+   the database can really say no. This mirror (and _shared/plans.ts's
+   PLAN_ASSISTANT_LIMITS) drives the friendly pre-check + upgrade
+   messaging; keep all three in sync by hand. Admins are exempt. */
+export const ASSISTANT_LIMITS: Record<PlanKey, number> = { trial: 2, pro: 10 };

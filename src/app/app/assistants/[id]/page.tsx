@@ -165,6 +165,9 @@ export default function AssistantEditorPage({ params }: { params: Promise<{ id: 
             persona: saved.persona.trim(),
             prompt: saved.prompt.trim(),
             voice: saved.voice.trim(),
+            // Snapshot like persona/prompt/voice — the public page's
+            // greeting must not drift until the next publish.
+            first_message: saved.first_message.trim(),
             updated_at: new Date().toISOString(),
           },
           { onConflict: "assistant_id" }

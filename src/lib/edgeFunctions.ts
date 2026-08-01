@@ -18,7 +18,7 @@ export class EdgeFunctionError extends Error {
    (detail > error > "fn-<status>"). */
 async function callEdgeFunction<T = unknown>(
   supabase: SupabaseClient,
-  name: "brible" | "imagegen" | "videogen" | "sheets-log" | "credits" | "provision-profile" | "admin-clients" | "stripe-checkout",
+  name: "brible" | "imagegen" | "videogen" | "sheets-log" | "credits" | "provision-profile" | "admin-clients" | "stripe-checkout" | "integration-test",
   payload: unknown
 ): Promise<T> {
   const {
@@ -63,8 +63,9 @@ export async function callAgentTalk<T = { reply: string }>(payload: {
   // Client-generated uuid — presence turns on server-side transcript
   // logging for the owner's Agent logs tab.
   sessionId?: string;
-  // "end" marks the session finished instead of sending a message.
-  action?: "end";
+  // "end" marks the session finished (fires extraction + the owner's
+  // destinations); "init" fetches {name, firstMessage} for the header.
+  action?: "end" | "init";
 }): Promise<T> {
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/agent-talk`, {
@@ -117,6 +118,17 @@ export async function callLeadCapture<T = { ok: boolean }>(payload: {
 
 export function callBrible<T = { remaining?: number }>(supabase: SupabaseClient, payload: unknown) {
   return callEdgeFunction<T>(supabase, "brible", payload);
+}
+
+// Fires one clearly-labeled sample payload at a single destination the
+// caller owns and returns pass/fail — the "confirm my data actually
+// lands in my CRM" button. Logged to integration_deliveries like a
+// real send; see supabase/functions/integration-test/index.ts.
+export function callIntegrationTest<T = { ok: boolean; statusCode: number | null; detail: string }>(
+  supabase: SupabaseClient,
+  toolId: string
+) {
+  return callEdgeFunction<T>(supabase, "integration-test", { toolId });
 }
 
 export function callImagegen<T = { remaining?: number }>(

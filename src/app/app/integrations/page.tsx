@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/app/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
+import { callIntegrationTest } from "@/lib/edgeFunctions";
 import { errorMessage } from "@/lib/assistantTemplate";
 
 type PublishedAssistant = {
@@ -13,32 +14,75 @@ type PublishedAssistant = {
   name: string;
 };
 
+type ToolType = "webhook" | "zapier" | "ghl" | "sheets";
+
+type ToolRow = {
+  id: string;
+  assistant_id: string | null;
+  type: ToolType;
+  name: string;
+  config: Record<string, unknown>;
+  enabled: boolean;
+  created_at: string;
+};
+
+type DeliveryRow = {
+  id: string;
+  type: string;
+  tool_name: string;
+  event: string;
+  ok: boolean;
+  status_code: number | null;
+  detail: string;
+  created_at: string;
+};
+
+type AssistantOption = { id: string; name: string };
+
+const TYPE_LABELS: Record<ToolType, string> = {
+  webhook: "Webhook",
+  zapier: "Zapier",
+  ghl: "GoHighLevel",
+  sheets: "Google Sheets",
+};
+
+// Optional deploy-time hint: the service-account email clients must
+// share their spreadsheet with (mirrors the server's GOOGLE_SA_EMAIL).
+const SHEETS_SA_EMAIL = process.env.NEXT_PUBLIC_SHEETS_SA_EMAIL || "";
+
+// Accepts a bare spreadsheet id or a full docs.google.com URL.
+function parseSpreadsheetId(raw: string): string {
+  const match = raw.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+  if (match) return match[1];
+  return raw.trim();
+}
+
+function validHttpsUrl(raw: string): boolean {
+  try {
+    return new URL(raw).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+// One-line "where does this go" summary for the destination list.
+function targetSummary(tool: ToolRow): string {
+  const config = tool.config ?? {};
+  switch (tool.type) {
+    case "webhook":
+    case "zapier":
+      return String(config.url ?? "");
+    case "ghl": {
+      const loc = String(config.locationId ?? "");
+      const pipeline = String(config.pipelineId ?? "");
+      return `location ${loc}${pipeline ? " · pipeline " + pipeline : " · contacts only"}`;
+    }
+    case "sheets":
+      return `sheet ${String(config.spreadsheetId ?? "")} · tab ${String(config.sheetName || "Sheet1")}`;
+  }
+}
+
 const COMING_SOON: { name: string; blurb: string; logo: ReactNode }[] = [
-  {
-    name: "Google Sheets",
-    blurb: "Collected onboarding data lands in your own sheet, ready for the rest of your stack.",
-    logo: (
-      <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden>
-        <path d="M6 2h8l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="#188038" />
-        <path d="M14 2v5h5z" fill="#8ED1B1" />
-        <path d="M8 11h8v6.5H8z M8 14.25h8 M12 11v6.5" fill="none" stroke="#fff" strokeWidth="1.2" />
-      </svg>
-    ),
-  },
-  {
-    name: "Zapier",
-    blurb: "Trigger any of 6,000+ apps when an onboarding conversation finishes.",
-    logo: (
-      <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden>
-        <path
-          d="M12 4v16M4 12h16M6.3 6.3l11.4 11.4M17.7 6.3L6.3 17.7"
-          stroke="#FF4F00"
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-      </svg>
-    ),
-  },
   {
     name: "Make",
     blurb: "Design multi-step scenarios that run whenever onboarding wraps up.",
@@ -56,16 +100,6 @@ const COMING_SOON: { name: string; blurb: string; logo: ReactNode }[] = [
         >
           M
         </text>
-      </svg>
-    ),
-  },
-  {
-    name: "GoHighLevel / CRM",
-    blurb: "Push new contacts and their answers straight into your CRM pipeline.",
-    logo: (
-      <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden>
-        <rect width="24" height="24" rx="5" fill="#0B5CFF" />
-        <path d="M7 17.5v-3.5M12 17.5v-7M17 17.5V6.5" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
       </svg>
     ),
   },
@@ -187,9 +221,43 @@ export default function IntegrationsPage() {
   const [published, setPublished] = useState<PublishedAssistant[] | null>(null);
   const [origin, setOrigin] = useState("");
 
+  const [tools, setTools] = useState<ToolRow[] | null>(null);
+  const [assistants, setAssistants] = useState<AssistantOption[]>([]);
+  const [deliveries, setDeliveries] = useState<DeliveryRow[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [testingId, setTestingId] = useState<string | null>(null);
+
+  // One connect form open at a time.
+  const [formType, setFormType] = useState<Exclude<ToolType, "webhook"> | null>(null);
+  const [formName, setFormName] = useState("");
+  const [formScope, setFormScope] = useState("all");
+  const [formUrl, setFormUrl] = useState("");
+  const [formToken, setFormToken] = useState("");
+  const [formLocationId, setFormLocationId] = useState("");
+  const [formPipelineId, setFormPipelineId] = useState("");
+  const [formStageId, setFormStageId] = useState("");
+  const [formTags, setFormTags] = useState("");
+  const [formSheet, setFormSheet] = useState("");
+  const [formSheetName, setFormSheetName] = useState("Sheet1");
+
   useEffect(() => {
     setOrigin(window.location.origin);
   }, []);
+
+  const deliveriesQuery = useCallback(
+    () =>
+      supabase
+        .from("integration_deliveries")
+        .select("id, type, tool_name, event, ok, status_code, detail, created_at")
+        .order("created_at", { ascending: false })
+        .limit(20),
+    [supabase]
+  );
+
+  async function loadDeliveries() {
+    const { data } = await deliveriesQuery();
+    setDeliveries((data ?? []) as DeliveryRow[]);
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -210,10 +278,33 @@ export default function IntegrationsPage() {
           )
         );
       });
+    supabase
+      .from("assistant_tools")
+      .select("id, assistant_id, type, name, config, enabled, created_at")
+      .order("created_at", { ascending: true })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) {
+          toast(error.message);
+          setTools([]);
+          return;
+        }
+        setTools((data ?? []) as ToolRow[]);
+      });
+    supabase
+      .from("assistants")
+      .select("id, name")
+      .order("created_at", { ascending: true })
+      .then(({ data }) => {
+        if (!cancelled) setAssistants((data ?? []) as AssistantOption[]);
+      });
+    deliveriesQuery().then(({ data }) => {
+      if (!cancelled) setDeliveries((data ?? []) as DeliveryRow[]);
+    });
     return () => {
       cancelled = true;
     };
-  }, [user, supabase, toast]);
+  }, [user, supabase, toast, deliveriesQuery]);
 
   function copy(text: string, label: string) {
     if (navigator.clipboard) navigator.clipboard.writeText(text);
@@ -241,14 +332,155 @@ export default function IntegrationsPage() {
     }
   }
 
+  function openForm(type: Exclude<ToolType, "webhook">) {
+    setFormType((current) => (current === type ? null : type));
+    setFormName(TYPE_LABELS[type]);
+    setFormScope("all");
+    setFormUrl("");
+    setFormToken("");
+    setFormLocationId("");
+    setFormPipelineId("");
+    setFormStageId("");
+    setFormTags("");
+    setFormSheet("");
+    setFormSheetName("Sheet1");
+  }
+
+  async function handleConnect(e: React.FormEvent) {
+    e.preventDefault();
+    if (!user || !formType || busy) return;
+
+    let config: Record<string, unknown>;
+    if (formType === "zapier") {
+      const url = formUrl.trim();
+      if (!validHttpsUrl(url)) {
+        toast("Paste your Zap's https:// catch-hook URL");
+        return;
+      }
+      config = { url };
+    } else if (formType === "ghl") {
+      const token = formToken.trim();
+      const locationId = formLocationId.trim();
+      if (!token || !locationId) {
+        toast("A Private Integration token and Location ID are both required");
+        return;
+      }
+      const pipelineId = formPipelineId.trim();
+      const stageId = formStageId.trim();
+      if ((pipelineId && !stageId) || (!pipelineId && stageId)) {
+        toast("To open pipeline opportunities, fill in BOTH pipeline and stage IDs (or neither)");
+        return;
+      }
+      const tags = formTags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+      config = { token, locationId };
+      if (pipelineId && stageId) {
+        config.pipelineId = pipelineId;
+        config.stageId = stageId;
+      }
+      if (tags.length > 0) config.tags = tags;
+    } else {
+      const spreadsheetId = parseSpreadsheetId(formSheet);
+      if (!spreadsheetId) {
+        toast("Paste your spreadsheet's URL or ID");
+        return;
+      }
+      config = { spreadsheetId, sheetName: formSheetName.trim() || "Sheet1" };
+    }
+
+    setBusy(true);
+    try {
+      const { data, error } = await supabase
+        .from("assistant_tools")
+        .insert({
+          user_id: user.id,
+          assistant_id: formScope === "all" ? null : formScope,
+          type: formType,
+          name: formName.trim() || TYPE_LABELS[formType],
+          config,
+        })
+        .select("id, assistant_id, type, name, config, enabled, created_at")
+        .single();
+      if (error) throw error;
+      setTools((prev) => [...(prev ?? []), data as ToolRow]);
+      setFormType(null);
+      toast(`${TYPE_LABELS[formType]} connected — hit "Send test" to confirm delivery`, true);
+    } catch (err) {
+      const message = errorMessage(err, "Couldn't connect the destination");
+      toast(
+        message.includes("tool_limit_reached")
+          ? "You've reached the 20-destination limit — remove one you no longer use first."
+          : message
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleToggle(tool: ToolRow) {
+    const { error } = await supabase
+      .from("assistant_tools")
+      .update({ enabled: !tool.enabled, updated_at: new Date().toISOString() })
+      .eq("id", tool.id);
+    if (error) {
+      toast(error.message);
+      return;
+    }
+    setTools((prev) => (prev ?? []).map((t) => (t.id === tool.id ? { ...t, enabled: !t.enabled } : t)));
+  }
+
+  async function handleDelete(tool: ToolRow) {
+    if (!confirm(`Delete "${tool.name}"? New conversations stop delivering to it immediately.`)) return;
+    const { error } = await supabase.from("assistant_tools").delete().eq("id", tool.id);
+    if (error) {
+      toast(error.message);
+      return;
+    }
+    setTools((prev) => (prev ?? []).filter((t) => t.id !== tool.id));
+    toast("Destination deleted", true);
+  }
+
+  async function handleTest(tool: ToolRow) {
+    if (testingId) return;
+    setTestingId(tool.id);
+    try {
+      const result = await callIntegrationTest(supabase, tool.id);
+      toast(result.ok ? `Test delivered — ${result.detail}` : `Test failed — ${result.detail}`, result.ok);
+    } catch (err) {
+      toast(errorMessage(err, "Couldn't send the test"));
+    } finally {
+      setTestingId(null);
+      loadDeliveries();
+    }
+  }
+
+  function scopeLabel(tool: ToolRow): string {
+    if (!tool.assistant_id) return "All assistants";
+    return assistants.find((a) => a.id === tool.assistant_id)?.name ?? "Deleted assistant";
+  }
+
+  const scopeSelect = (
+    <div className="field">
+      <label htmlFor="destScope">Fires for</label>
+      <select id="destScope" className="input" value={formScope} onChange={(e) => setFormScope(e.target.value)}>
+        <option value="all">All assistants</option>
+        {assistants.map((a) => (
+          <option key={a.id} value={a.id}>{a.name}</option>
+        ))}
+      </select>
+    </div>
+  );
+
   return (
     <>
       <div className="page-head">
         <div>
           <h2>Integrations</h2>
           <p className="page-sub">
-            Put your onboarding agent wherever your clients already are — share the link, embed the chat,
-            or wire the results into your own systems.
+            Put your onboarding agent wherever your clients already are — and when a conversation ends,
+            the contact details and answers it collected land in your own systems automatically.
           </p>
         </div>
       </div>
@@ -291,16 +523,201 @@ export default function IntegrationsPage() {
       </div>
 
       <div className="panel" style={{ marginBottom: 14 }}>
-        <h3>Webhooks</h3>
+        <h3>Where collected data goes</h3>
         <p className="panel-sub">
-          Every finished conversation can POST its transcript to your endpoint — Zapier, n8n, or your own
-          server. Set that up on the <Link href="/app/tools">Tools</Link> tab.
+          When a conversation ends we extract the contact and their answers, then deliver to every
+          destination below. Webhooks (signed, for your own server or n8n) are managed on the{" "}
+          <Link href="/app/tools">Tools</Link> tab.
         </p>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => openForm("ghl")}>
+            {formType === "ghl" ? "Cancel" : "Connect GoHighLevel"}
+          </button>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => openForm("sheets")}>
+            {formType === "sheets" ? "Cancel" : "Connect Google Sheets"}
+          </button>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => openForm("zapier")}>
+            {formType === "zapier" ? "Cancel" : "Connect Zapier"}
+          </button>
+        </div>
+
+        {formType === "ghl" && (
+          <form onSubmit={handleConnect} style={{ marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 14 }}>
+            <h3 style={{ fontSize: 15 }}>Connect GoHighLevel</h3>
+            <p className="panel-sub">
+              Each finished conversation upserts the contact into your GHL location, attaches the
+              answers as a note, and (optionally) opens an opportunity in your pipeline. Create a{" "}
+              Private Integration token under Settings → Private Integrations in your GHL sub-account
+              (scopes: contacts and opportunities).
+            </p>
+            <div className="field" style={{ marginTop: 10 }}>
+              <label htmlFor="ghlName">Name</label>
+              <input id="ghlName" className="input" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g. Main CRM" />
+            </div>
+            <div className="field">
+              <label htmlFor="ghlToken">Private Integration token</label>
+              <input id="ghlToken" className="input" value={formToken} onChange={(e) => setFormToken(e.target.value)} placeholder="pit-…" required />
+              <p className="hint">Stored on your account and used only server-side to deliver your own data.</p>
+            </div>
+            <div className="field">
+              <label htmlFor="ghlLocation">Location ID</label>
+              <input id="ghlLocation" className="input" value={formLocationId} onChange={(e) => setFormLocationId(e.target.value)} placeholder="e.g. ve9EPM428h8vShlRW1KT" required />
+            </div>
+            <div className="field">
+              <label htmlFor="ghlPipeline">Pipeline ID (optional)</label>
+              <input id="ghlPipeline" className="input" value={formPipelineId} onChange={(e) => setFormPipelineId(e.target.value)} placeholder="leave empty to only create contacts" />
+            </div>
+            <div className="field">
+              <label htmlFor="ghlStage">Pipeline stage ID (optional)</label>
+              <input id="ghlStage" className="input" value={formStageId} onChange={(e) => setFormStageId(e.target.value)} placeholder="the stage new opportunities land in" />
+            </div>
+            <div className="field">
+              <label htmlFor="ghlTags">Tags (optional, comma-separated)</label>
+              <input id="ghlTags" className="input" value={formTags} onChange={(e) => setFormTags(e.target.value)} placeholder="e.g. bsl-onboarding, new-lead" />
+            </div>
+            {scopeSelect}
+            <button type="submit" className="btn btn-primary" disabled={busy}>
+              <span className="btn-label">{busy ? "Connecting…" : "Connect GoHighLevel"}</span>
+            </button>
+          </form>
+        )}
+
+        {formType === "sheets" && (
+          <form onSubmit={handleConnect} style={{ marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 14 }}>
+            <h3 style={{ fontSize: 15 }}>Connect Google Sheets</h3>
+            <p className="panel-sub">
+              Each finished conversation appends one row: time, assistant, contact name/email/phone/company,
+              summary, and every answer.
+              {SHEETS_SA_EMAIL
+                ? ` Share your spreadsheet (Editor access) with ${SHEETS_SA_EMAIL} first — appends are rejected otherwise.`
+                : " Share your spreadsheet (Editor access) with our service-account email first — it's shown in the delivery log if an append is rejected."}
+            </p>
+            <div className="field" style={{ marginTop: 10 }}>
+              <label htmlFor="sheetName">Name</label>
+              <input id="sheetName" className="input" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g. Onboarding sheet" />
+            </div>
+            <div className="field">
+              <label htmlFor="sheetId">Spreadsheet URL or ID</label>
+              <input id="sheetId" className="input" value={formSheet} onChange={(e) => setFormSheet(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/…" required />
+            </div>
+            <div className="field">
+              <label htmlFor="sheetTab">Tab name</label>
+              <input id="sheetTab" className="input" value={formSheetName} onChange={(e) => setFormSheetName(e.target.value)} placeholder="Sheet1" />
+            </div>
+            {scopeSelect}
+            <button type="submit" className="btn btn-primary" disabled={busy}>
+              <span className="btn-label">{busy ? "Connecting…" : "Connect Google Sheets"}</span>
+            </button>
+          </form>
+        )}
+
+        {formType === "zapier" && (
+          <form onSubmit={handleConnect} style={{ marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 14 }}>
+            <h3 style={{ fontSize: 15 }}>Connect Zapier</h3>
+            <p className="panel-sub">
+              In Zapier, create a Zap with the &ldquo;Webhooks by Zapier → Catch Hook&rdquo; trigger and paste its
+              URL here — every finished conversation triggers it with the contact, answers, summary, and
+              transcript, ready to map into 6,000+ apps.
+            </p>
+            <div className="field" style={{ marginTop: 10 }}>
+              <label htmlFor="zapName">Name</label>
+              <input id="zapName" className="input" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g. New client Zap" />
+            </div>
+            <div className="field">
+              <label htmlFor="zapUrl">Catch-hook URL</label>
+              <input id="zapUrl" className="input" value={formUrl} onChange={(e) => setFormUrl(e.target.value)} placeholder="https://hooks.zapier.com/hooks/catch/…" required />
+            </div>
+            {scopeSelect}
+            <button type="submit" className="btn btn-primary" disabled={busy}>
+              <span className="btn-label">{busy ? "Connecting…" : "Connect Zapier"}</span>
+            </button>
+          </form>
+        )}
+
+        {tools === null ? (
+          <p className="panel-sub" style={{ marginTop: 14 }}>Loading destinations…</p>
+        ) : tools.length === 0 ? (
+          <p className="panel-sub" style={{ marginTop: 14 }}>
+            No destinations yet — connect one above and every finished conversation lands in it
+            automatically.
+          </p>
+        ) : (
+          tools.map((tool) => (
+            <div key={tool.id} style={{ padding: "14px 0", borderTop: "1px solid var(--border)", marginTop: 14 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ minWidth: 220 }}>
+                  <strong style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    {tool.name}
+                    <span className="side-badge">{TYPE_LABELS[tool.type]}</span>
+                    <span className={`side-badge${tool.enabled ? "" : " side-badge-admin"}`}>
+                      {tool.enabled ? "On" : "Off"}
+                    </span>
+                  </strong>
+                  <p className="panel-sub" style={{ margin: "4px 0 0", wordBreak: "break-all" }}>
+                    {targetSummary(tool)} · {scopeLabel(tool)}
+                  </p>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => handleTest(tool)}
+                    disabled={testingId !== null}
+                  >
+                    {testingId === tool.id ? "Sending…" : "Send test"}
+                  </button>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleToggle(tool)}>
+                    {tool.enabled ? "Disable" : "Enable"}
+                  </button>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleDelete(tool)}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="panel" style={{ marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <h3>Recent deliveries</h3>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={loadDeliveries}>
+            Refresh
+          </button>
+        </div>
+        <p className="panel-sub">
+          Every attempted delivery — real conversations and test sends — with exactly what happened.
+          This is your proof the data landed.
+        </p>
+        {deliveries === null ? (
+          <p className="panel-sub" style={{ marginTop: 10 }}>Loading…</p>
+        ) : deliveries.length === 0 ? (
+          <p className="panel-sub" style={{ marginTop: 10 }}>
+            Nothing delivered yet — connect a destination and hit &ldquo;Send test&rdquo;.
+          </p>
+        ) : (
+          deliveries.map((d) => (
+            <div key={d.id} style={{ padding: "10px 0", borderTop: "1px solid var(--border)", marginTop: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span className={`side-badge${d.ok ? "" : " side-badge-admin"}`}>{d.ok ? "Delivered" : "Failed"}</span>
+                <strong style={{ fontSize: 13.5 }}>{d.tool_name || TYPE_LABELS[d.type as ToolType] || d.type}</strong>
+                <span className="panel-sub" style={{ margin: 0, fontSize: 12.5 }}>
+                  {d.event} · {new Date(d.created_at).toLocaleString()}
+                </span>
+              </div>
+              <p className="panel-sub" style={{ margin: "4px 0 0", fontSize: 12.5, wordBreak: "break-word" }}>
+                {d.detail}
+              </p>
+            </div>
+          ))
+        )}
       </div>
 
       <div className="panel">
-        <h3>Native integrations</h3>
-        <p className="panel-sub">Coming soon — tell us which one you need first.</p>
+        <h3>More native integrations</h3>
+        <p className="panel-sub">Coming soon — tell us which one you need first. (Most already work today through Zapier or a webhook.)</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12, marginTop: 12 }}>
           {COMING_SOON.map((c) => (
             <div key={c.name} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 16 }}>

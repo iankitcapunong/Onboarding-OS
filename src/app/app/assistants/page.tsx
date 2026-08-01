@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { useFeatureGating } from "@/hooks/useFeatureGating";
 import { useToast } from "@/components/app/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
 import { getJSON, scopedKey } from "@/lib/storage";
+import { ASSISTANT_LIMITS } from "@/lib/featureGating";
 import {
   AssistantRow,
   DeploymentRow,
@@ -18,12 +20,36 @@ type LegacyPlaygroundState = { persona?: string; voice?: string; prompt?: string
 
 export default function AssistantsPage() {
   const { user } = useAuth();
+  const { isAdmin, planKey } = useFeatureGating();
   const toast = useToast();
   const router = useRouter();
   const [supabase] = useState(() => createClient());
   const [assistants, setAssistants] = useState<AssistantRow[] | null>(null);
   const [deployments, setDeployments] = useState<Record<string, DeploymentRow>>({});
   const [busy, setBusy] = useState(false);
+
+  const assistantLimit = ASSISTANT_LIMITS[planKey];
+
+  // Optimistic pre-check only — the enforce_assistant_limit() DB
+  // trigger is the real gate. Both surface the same upgrade message.
+  function atAssistantCap(): boolean {
+    if (isAdmin || assistants === null) return false;
+    if (assistants.length < assistantLimit) return false;
+    toast(
+      planKey === "pro"
+        ? `Your plan allows up to ${assistantLimit} assistants — delete one you no longer use first.`
+        : `The free trial allows ${assistantLimit} assistants — upgrade to Pro for up to ${ASSISTANT_LIMITS.pro}.`
+    );
+    return true;
+  }
+
+  function capErrorMessage(err: unknown, fallback: string): string {
+    const message = errorMessage(err, fallback);
+    if (!message.includes("assistant_limit_reached")) return message;
+    return planKey === "pro"
+      ? `Your plan allows up to ${assistantLimit} assistants — delete one you no longer use first.`
+      : `The free trial allows ${assistantLimit} assistants — upgrade to Pro for up to ${ASSISTANT_LIMITS.pro}.`;
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -90,7 +116,7 @@ export default function AssistantsPage() {
   }, [user, supabase, toast]);
 
   async function handleNew() {
-    if (!user || busy) return;
+    if (!user || busy || atAssistantCap()) return;
     setBusy(true);
     try {
       const { data, error } = await supabase
@@ -108,13 +134,34 @@ export default function AssistantsPage() {
       if (error) throw error;
       router.push(`/app/assistants/${(data as { id: string }).id}`);
     } catch (err) {
-      toast(errorMessage(err, "Couldn't create an assistant"));
+      toast(capErrorMessage(err, "Couldn't create an assistant"));
       setBusy(false);
     }
   }
 
+  async function handleRename(a: AssistantRow) {
+    const name = window.prompt('Rename assistant (e.g. "Onboarding", "New-hire interview")', a.name);
+    if (name === null) return;
+    const cleaned = name.trim().slice(0, 80);
+    if (!cleaned || cleaned === a.name) return;
+    try {
+      const updatedAt = new Date().toISOString();
+      const { error } = await supabase
+        .from("assistants")
+        .update({ name: cleaned, updated_at: updatedAt })
+        .eq("id", a.id);
+      if (error) throw error;
+      setAssistants((prev) =>
+        (prev ?? []).map((x) => (x.id === a.id ? { ...x, name: cleaned, updated_at: updatedAt } : x))
+      );
+      toast("Assistant renamed", true);
+    } catch (err) {
+      toast(errorMessage(err, "Couldn't rename"));
+    }
+  }
+
   async function handleDuplicate(a: AssistantRow) {
-    if (!user || busy) return;
+    if (!user || busy || atAssistantCap()) return;
     setBusy(true);
     try {
       const { data, error } = await supabase
@@ -134,7 +181,7 @@ export default function AssistantsPage() {
       setAssistants((prev) => [...(prev ?? []), data as AssistantRow]);
       toast("Assistant duplicated", true);
     } catch (err) {
-      toast(errorMessage(err, "Couldn't duplicate"));
+      toast(capErrorMessage(err, "Couldn't duplicate"));
     } finally {
       setBusy(false);
     }
@@ -224,6 +271,9 @@ export default function AssistantsPage() {
                       Copy link
                     </button>
                   )}
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleRename(a)} disabled={busy}>
+                    Rename
+                  </button>
                   <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleDuplicate(a)} disabled={busy}>
                     Duplicate
                   </button>
