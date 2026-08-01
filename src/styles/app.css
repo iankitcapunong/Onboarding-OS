@@ -155,7 +155,7 @@
   gap: 16px;
   height: 64px;
   padding: 0 28px;
-  background: rgba(9, 10, 7, 0.78);
+  background: rgba(16, 19, 12, 0.8);
   backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(236, 244, 214, 0.1);
   color: var(--ink);
@@ -446,7 +446,7 @@
 .chart-tooltip {
   position: absolute;
   pointer-events: none;
-  background: #16180f;
+  background: #1c2014;
   border: 1px solid var(--border-strong);
   color: var(--ink);
   font-size: 12.5px;
@@ -3753,18 +3753,18 @@ body.brible-active .app-main { padding: 0; max-width: none; }
    ============================================================ */
 
 .app-body {
-  /* Charcoal base with faint lime / mint ambient glows */
+  /* Green-tinted charcoal base with lime / mint ambient glows */
   background:
-    radial-gradient(ellipse 1100px 780px at 10% -10%, rgba(205, 244, 99, 0.07) 0%, transparent 60%),
-    radial-gradient(ellipse 900px 700px at 96% 32%, rgba(127, 224, 178, 0.05) 0%, transparent 60%),
-    radial-gradient(ellipse 800px 640px at 40% 110%, rgba(205, 244, 99, 0.04) 0%, transparent 58%),
-    #0a0b08;
+    radial-gradient(ellipse 1100px 780px at 10% -10%, rgba(205, 244, 99, 0.13) 0%, transparent 60%),
+    radial-gradient(ellipse 900px 700px at 96% 32%, rgba(127, 224, 178, 0.09) 0%, transparent 60%),
+    radial-gradient(ellipse 800px 640px at 40% 110%, rgba(205, 244, 99, 0.08) 0%, transparent 58%),
+    #10130c;
   background-attachment: fixed;
 }
 
 /* Sidebar — translucent charcoal glass */
 .app-body .sidebar {
-  background: rgba(8, 9, 6, 0.85);
+  background: rgba(14, 17, 11, 0.88);
   backdrop-filter: blur(24px);
   border-right: 1px solid rgba(236, 244, 214, 0.08);
 }
@@ -3775,14 +3775,14 @@ body.brible-active .app-main { padding: 0; max-width: none; }
 
 /* Panels and tiles — dark glass */
 .app-body .panel {
-  background: rgba(19, 21, 15, 0.72);
+  background: rgba(28, 32, 21, 0.72);
   backdrop-filter: blur(14px);
   border-color: rgba(236, 244, 214, 0.1);
   box-shadow: 0 4px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(236,244,214,0.04);
 }
 
 .app-body .tile {
-  background: rgba(19, 21, 15, 0.72);
+  background: rgba(28, 32, 21, 0.72);
   backdrop-filter: blur(14px);
   border-color: rgba(236, 244, 214, 0.1);
   box-shadow: 0 4px 20px rgba(0,0,0,0.35);
@@ -3791,21 +3791,21 @@ body.brible-active .app-main { padding: 0; max-width: none; }
 .app-body .tile:hover { border-color: rgba(205, 244, 99, 0.4); box-shadow: 0 8px 32px rgba(0,0,0,0.45); }
 
 /* Chat + call log bodies */
-.app-body .chat-scroll { background: rgba(5, 6, 4, 0.55); }
-.app-body .call-log-body { background: rgba(5, 6, 4, 0.55); }
+.app-body .chat-scroll { background: rgba(8, 10, 6, 0.55); }
+.app-body .call-log-body { background: rgba(8, 10, 6, 0.55); }
 
 /* Message bubbles */
-.app-body .msg-agent { background: rgba(26, 29, 20, 0.88); border-color: rgba(236,244,214,0.12); color: var(--ink); }
-.app-body .typing { background: rgba(26, 29, 20, 0.88); border-color: rgba(236,244,214,0.12); }
-.app-body .chat-input-row { background: rgba(8, 9, 6, 0.85); border-top-color: rgba(236,244,214,0.1); }
+.app-body .msg-agent { background: rgba(32, 37, 24, 0.88); border-color: rgba(236,244,214,0.12); color: var(--ink); }
+.app-body .typing { background: rgba(32, 37, 24, 0.88); border-color: rgba(236,244,214,0.12); }
+.app-body .chat-input-row { background: rgba(14, 17, 11, 0.88); border-top-color: rgba(236,244,214,0.1); }
 .app-body .chat-head { border-bottom-color: rgba(236,244,214,0.1); }
 
 /* Call log cards */
-.app-body .call-log { background: rgba(19, 21, 15, 0.72); border-color: rgba(236,244,214,0.1); }
+.app-body .call-log { background: rgba(28, 32, 21, 0.72); border-color: rgba(236,244,214,0.1); }
 .app-body .call-log-view { background: rgba(255,255,255,0.06); border-color: rgba(236,244,214,0.14); color: var(--ink-2); }
 
 /* Dropdown */
-.app-body .dropdown { background: rgba(13, 15, 10, 0.96); border-color: rgba(236,244,214,0.12); backdrop-filter: blur(18px); }
+.app-body .dropdown { background: rgba(24, 28, 18, 0.97); border-color: rgba(236,244,214,0.12); backdrop-filter: blur(18px); }
 .app-body .dropdown-head { border-bottom-color: rgba(236,244,214,0.1); }
 .app-body .dropdown-item { color: var(--ink); }
 .app-body .dropdown-item:hover { background: rgba(255,255,255,0.07); }
@@ -3813,34 +3813,34 @@ body.brible-active .app-main { padding: 0; max-width: none; }
 
 /* Toast: --ink flips to near-white in dark mode, but the toast still wants
    a dark chip with light text, so it needs its own fixed colors here. */
-.app-body .toast { background: #16180f; color: var(--ink); border: 1px solid rgba(236,244,214,0.14); }
+.app-body .toast { background: #1c2014; color: var(--ink); border: 1px solid rgba(236,244,214,0.14); }
 .app-body .toast.success svg { color: var(--primary); }
 
 /* Modal */
-.app-body .modal { background: rgba(13, 15, 10, 0.96); backdrop-filter: blur(18px); }
+.app-body .modal { background: rgba(24, 28, 18, 0.97); backdrop-filter: blur(18px); }
 .app-body .modal-head { border-bottom-color: rgba(236,244,214,0.1); }
 .app-body .modal-foot { border-top-color: rgba(236,244,214,0.1); }
 .app-body .modal-spinbar { background: rgba(255,255,255,0.03); border-bottom-color: rgba(236,244,214,0.08); }
 
 /* Sheet grid */
-.app-body .sheet-grid-wrap { background: rgba(19, 21, 15, 0.72); border-color: rgba(236,244,214,0.1); }
+.app-body .sheet-grid-wrap { background: rgba(28, 32, 21, 0.72); border-color: rgba(236,244,214,0.1); }
 .app-body .sheet-grid th,
-.app-body .sheet-grid td { background: rgba(19, 21, 15, 0.72); border-color: rgba(236,244,214,0.07); }
+.app-body .sheet-grid td { background: rgba(28, 32, 21, 0.72); border-color: rgba(236,244,214,0.07); }
 .app-body .sheet-grid .sheet-rownum { background: rgba(255,255,255,0.04); }
 .app-body .sheet-grid .sheet-headrow th,
-.app-body .sheet-grid .sheet-headrow td { background: rgba(11, 12, 8, 0.92); }
+.app-body .sheet-grid .sheet-headrow td { background: rgba(18, 21, 14, 0.92); }
 .app-body .sheet-grid .sheet-headrow .sheet-rownum { background: rgba(255,255,255,0.05); }
 
 /* Image & prompt editors */
-.app-body .ig-card { background: rgba(19, 21, 15, 0.72); border-color: rgba(236,244,214,0.1); }
-.app-body .ig-model { background: rgba(19, 21, 15, 0.72); border-color: rgba(236,244,214,0.12); color: var(--ink); }
-.app-body .ig-pill { background: rgba(19, 21, 15, 0.72); border-color: rgba(236,244,214,0.12); }
-.app-body .ig-frame { background: rgba(5, 6, 4, 0.7); }
+.app-body .ig-card { background: rgba(28, 32, 21, 0.72); border-color: rgba(236,244,214,0.1); }
+.app-body .ig-model { background: rgba(28, 32, 21, 0.72); border-color: rgba(236,244,214,0.12); color: var(--ink); }
+.app-body .ig-pill { background: rgba(28, 32, 21, 0.72); border-color: rgba(236,244,214,0.12); }
+.app-body .ig-frame { background: rgba(8, 10, 6, 0.7); }
 .app-body .ig-shimmer {
   background: linear-gradient(100deg, rgba(255,255,255,0.04) 40%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.04) 60%);
   background-size: 200% 100%;
 }
-.app-body .pp-mono { background: rgba(5, 6, 4, 0.7); }
+.app-body .pp-mono { background: rgba(8, 10, 6, 0.7); }
 
 /* Misc UI */
 .app-body .chip { background: rgba(255,255,255,0.05); border-color: rgba(236,244,214,0.12); }
@@ -3850,7 +3850,7 @@ body.brible-active .app-main { padding: 0; max-width: none; }
 .app-body .plan-tag { background: rgba(255,255,255,0.04); border-color: rgba(236,244,214,0.18); }
 .app-body .plan-box { border-color: rgba(236,244,214,0.12); background: rgba(255,255,255,0.03); }
 .app-body .divider { border-top-color: rgba(236,244,214,0.08); }
-.app-body .asset-opt-body { border-color: rgba(236,244,214,0.12); background: rgba(19,21,15,0.72); }
+.app-body .asset-opt-body { border-color: rgba(236,244,214,0.12); background: rgba(28, 32, 21, 0.72); }
 .app-body .say-hints { background: rgba(255,255,255,0.04); border-color: rgba(236,244,214,0.12); }
 .app-body .access-card { background: rgba(255,255,255,0.03); }
 .app-body .capture-item { border-bottom-color: rgba(236,244,214,0.08); }

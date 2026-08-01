@@ -22,15 +22,15 @@
   --muted: #808875;
 
   /* Surfaces */
-  --bg: #0a0b08;
-  --surface: rgba(19, 21, 15, 0.72);
-  --surface-2: rgba(255, 255, 255, 0.05);
-  --border: rgba(236, 244, 214, 0.09);
-  --border-strong: rgba(236, 244, 214, 0.18);
+  --bg: #10130c;
+  --surface: rgba(28, 32, 21, 0.72);
+  --surface-2: rgba(255, 255, 255, 0.06);
+  --border: rgba(236, 244, 214, 0.1);
+  --border-strong: rgba(236, 244, 214, 0.2);
 
   /* Deep panels (sidebar / footer / dark bands) */
-  --navy: #0d0f0a;
-  --navy-2: #12140e;
+  --navy: #131610;
+  --navy-2: #181c12;
   --navy-border: rgba(236, 244, 214, 0.1);
   --on-navy: #e9edde;
   --on-navy-muted: #9aa18c;
@@ -545,7 +545,7 @@ select:focus-visible {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #16180f;
+  background: #1c2014;
   border: 1px solid var(--border-strong);
   color: var(--ink);
   padding: 12px 20px;
@@ -581,7 +581,7 @@ select:focus-visible {
 .modal-overlay.open { display: flex; }
 
 .modal {
-  background: #14160f;
+  background: #1b1f13;
   border: 1px solid var(--border-strong);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-lg);
