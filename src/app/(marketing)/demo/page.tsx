@@ -3,6 +3,7 @@ import Link from "next/link";
 import { BrandMark } from "@/components/site/BrandMark";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { PowerBackdrop } from "@/components/site/PowerBackdrop";
+import { PowerHeroImg } from "@/components/site/PowerHeroImg";
 import { PageMotion } from "@/components/site/PageMotion";
 import { DemoVsl } from "@/components/site/DemoVsl";
 
@@ -33,6 +34,7 @@ export default function DemoPage() {
 
       <main id="main">
         <section className="hero">
+          <PowerHeroImg />
           <div className="container hero-inner">
             <span className="badge badge-hero">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
