@@ -1403,6 +1403,43 @@ main,
   z-index: 0;
 }
 
+/* Layer 2 (video variant) — the template's hero footage. Opacity is
+   JS-driven from currentTime (PowerVideo.tsx); transition must stay
+   none or the CSS would fight the requestAnimationFrame fade. */
+.power .power-video {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.power .power-video video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: none;
+  will-change: opacity;
+}
+
+/* Occlusion — the spec's 984×527 blurred pill that darkens the focal
+   center of the screen (bg-gray-950, blur 82px, 90% opacity) */
+.power .power-occlusion {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 984px;
+  height: 527px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: #030712;
+  filter: blur(82px);
+  opacity: 0.9;
+  z-index: 0;
+  pointer-events: none;
+}
+
 /* Layer 3 — darkened veil above the particle scene (.page-scene sits
    between the two divs in DOM order). Gradient-only: a full-viewport
    backdrop-filter over an animated canvas would tank frame rate. */
