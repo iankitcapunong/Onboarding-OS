@@ -168,12 +168,32 @@ export function callProvisionProfile<T = { plan?: string; trialEndsAt?: string }
 // returns its URL — the browser never talks to Stripe directly. The
 // only subscription is Pro; plan and credits only change once
 // stripe-webhook confirms payment.
+/* Webhook-free confirmation: "confirm" hands the session id from
+   Stripe's success redirect back to the function, which verifies the
+   payment with Stripe server-side (idempotent — a refresh re-sending
+   the same id gets { ok, duplicate } and grants nothing twice) before
+   any plan/credit change. "sync" re-reads the subscription from Stripe
+   and mirrors it into profiles, catching portal cancellations and
+   lapsed renewals that a webhook would have pushed. */
+export type StripeConfirmResult = {
+  ok: boolean;
+  kind?: "subscribe" | "topup" | "unknown";
+  plan?: string;
+  duplicate?: boolean;
+  status?: string;
+  payment_status?: string;
+};
+
+export type StripeSyncResult = { ok: boolean; plan: PlanKey; synced: boolean };
+
 export function callStripeCheckout<T = { url: string }>(
   supabase: SupabaseClient,
   payload:
     | { action: "subscribe" }
     | { action: "topup"; pack: "small" | "large" }
     | { action: "portal" }
+    | { action: "confirm"; session_id: string }
+    | { action: "sync" }
 ) {
   return callEdgeFunction<T>(supabase, "stripe-checkout", payload);
 }

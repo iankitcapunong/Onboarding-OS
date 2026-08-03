@@ -1,12 +1,12 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useFeatureGating } from "@/hooks/useFeatureGating";
 import { useCredits } from "@/hooks/useCredits";
 import { useToast } from "@/components/app/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
-import { callStripeCheckout } from "@/lib/edgeFunctions";
+import { callStripeCheckout, type StripeConfirmResult, type StripeSyncResult } from "@/lib/edgeFunctions";
 import { PLAN_CREDITS } from "@/lib/featureGating";
 
 const PRO_FEATURES = [
@@ -34,7 +34,49 @@ function BillingContent() {
   const [busy, setBusy] = useState<string | null>(null);
 
   const status = searchParams.get("status");
+  const sessionId = searchParams.get("session_id");
   const isPro = planKey === "pro";
+
+  /* Webhook-free confirmation. Stripe's success redirect carries
+     ?session_id=cs_…; hand it to the Edge Function, which verifies the
+     payment with Stripe before touching the plan. No URL scrubbing
+     needed: the server claims each session id once, so a refresh gets
+     { duplicate: true } and nothing double-grants. The plan flip itself
+     arrives through the profiles realtime stream (useFeatureGating). */
+  const [confirmState, setConfirmState] = useState<"idle" | "confirming" | "confirmed" | "failed">(
+    status === "success" && sessionId ? "confirming" : "idle"
+  );
+  const [confirmedKind, setConfirmedKind] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (status !== "success" || !sessionId) return;
+    let cancelled = false;
+    callStripeCheckout<StripeConfirmResult>(supabase, { action: "confirm", session_id: sessionId })
+      .then((res) => {
+        if (cancelled) return;
+        if (res.ok) {
+          setConfirmState("confirmed");
+          setConfirmedKind(res.kind ?? null);
+          if (res.kind === "topup") toast("Credits added to your account.");
+        } else {
+          setConfirmState("failed");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setConfirmState("failed");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [status, sessionId, supabase, toast]);
+
+  /* Reconcile with Stripe on plain visits: catches portal
+     cancellations and lapsed renewals. Result lands via the profiles
+     realtime stream, so nothing to do with the response here. */
+  useEffect(() => {
+    if (status === "success") return;
+    callStripeCheckout<StripeSyncResult>(supabase, { action: "sync" }).catch(() => {});
+  }, [status, supabase]);
 
   async function go(payload: Parameters<typeof callStripeCheckout>[1], key: string) {
     setBusy(key);
@@ -63,12 +105,28 @@ function BillingContent() {
         </div>
       </div>
 
-      {status === "success" && (
+      {confirmState === "confirming" && (
+        <div className="panel" style={{ marginBottom: 14, borderColor: "var(--primary)" }}>
+          <h3>Confirming your payment…</h3>
+          <p className="panel-sub">Checking with Stripe — this takes a second or two.</p>
+        </div>
+      )}
+      {confirmState === "confirmed" && (
         <div className="panel" style={{ marginBottom: 14, borderColor: "var(--primary)" }}>
           <h3>Payment confirmed</h3>
           <p className="panel-sub">
-            Stripe has confirmed your payment — your account updates here the moment the webhook lands,
-            usually within a few seconds.
+            {confirmedKind === "topup"
+              ? "Your credits have been added and are ready to use."
+              : "Welcome to Pro — everything is unlocked."}
+          </p>
+        </div>
+      )}
+      {confirmState === "failed" && (
+        <div className="panel" style={{ marginBottom: 14 }}>
+          <h3>Payment not confirmed yet</h3>
+          <p className="panel-sub">
+            Stripe hasn&rsquo;t marked this payment as complete. If you finished checkout, reload this
+            page in a moment — and if you were charged but nothing changes, contact support.
           </p>
         </div>
       )}
