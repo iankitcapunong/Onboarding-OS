@@ -1404,6 +1404,11 @@ main,
   object-fit: cover;
   object-position: center;
   opacity: 0.6;
+  /* Zoomed out a touch; the mask feathers the frame edge into the
+     plasma so the scaled-down rectangle never shows a hard seam */
+  transform: scale(0.85);
+  -webkit-mask-image: radial-gradient(ellipse 78% 74% at 50% 48%, black 55%, transparent 92%);
+  mask-image: radial-gradient(ellipse 78% 74% at 50% 48%, black 55%, transparent 92%);
   pointer-events: none;
 }
 
