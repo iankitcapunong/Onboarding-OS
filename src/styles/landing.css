@@ -1358,12 +1358,14 @@ main,
    landing + demo. Other routes keep the charcoal + lime canvas.)
    ============================================================ */
 .power {
-  /* RGB triplets so alpha can vary per layer via rgba(var(...), a) */
-  --pw-bg: hsl(260, 87%, 3%);
-  --pw-indigo: 99, 102, 241;
-  --pw-purple: 168, 85, 247;
+  /* RGB triplets so alpha can vary per layer via rgba(var(...), a).
+     Brand-lime edition: accent-1 is the primary #CDF463, accent-2 the
+     mint #7FE0B2, on a near-black green-cast canvas. */
+  --pw-bg: #0d1107;
+  --pw-accent-1: 205, 244, 99;
+  --pw-accent-2: 127, 224, 178;
   --pw-gold: 252, 211, 77;
-  --pw-overlay: 3, 7, 18;
+  --pw-overlay: 6, 9, 3;
 }
 
 /* Layer 1 — base canvas: near-black indigo, restrained ambient glows */
@@ -1373,9 +1375,9 @@ main,
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 74% 48% at 50% -12%, rgba(var(--pw-indigo), 0.14), transparent 66%),
-    radial-gradient(ellipse 44% 34% at 102% 98%, rgba(var(--pw-purple), 0.1), transparent 70%),
-    radial-gradient(ellipse 38% 30% at -6% 60%, rgba(var(--pw-indigo), 0.07), transparent 70%),
+    radial-gradient(ellipse 74% 48% at 50% -12%, rgba(var(--pw-accent-1), 0.14), transparent 66%),
+    radial-gradient(ellipse 44% 34% at 102% 98%, rgba(var(--pw-accent-2), 0.1), transparent 70%),
+    radial-gradient(ellipse 38% 30% at -6% 60%, rgba(var(--pw-accent-1), 0.07), transparent 70%),
     var(--pw-bg);
 }
 
@@ -1392,7 +1394,7 @@ main,
   max-width: 160vw;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(var(--pw-indigo), 0.13), rgba(var(--pw-purple), 0.05) 46%, transparent 70%);
+  background: radial-gradient(circle, rgba(var(--pw-accent-1), 0.13), rgba(var(--pw-accent-2), 0.05) 46%, transparent 70%);
 }
 
 /* Layer 2 — the tube scene. funnel.css (imported after this file)
@@ -1421,6 +1423,9 @@ main,
   opacity: 0;
   transition: none;
   will-change: opacity;
+  /* The source footage is indigo/purple — rotate it onto the brand
+     lime (#CDF463): ~200° lands the footage's blues on chartreuse */
+  filter: hue-rotate(185deg) saturate(1.05);
 }
 
 /* Occlusion — the spec's 984×527 blurred pill that darkens the focal
@@ -1433,7 +1438,7 @@ main,
   height: 527px;
   transform: translate(-50%, -50%);
   border-radius: 999px;
-  background: #030712;
+  background: #080b04;
   filter: blur(82px);
   opacity: 0.9;
   z-index: 0;
@@ -1472,23 +1477,23 @@ main,
 
 /* Hero glow — indigo core, purple falloff, a whisper of gold */
 .power .hero::before {
-  background: radial-gradient(ellipse 50% 42% at 50% 50%, rgba(var(--pw-indigo), 0.2), rgba(var(--pw-purple), 0.08) 45%, rgba(var(--pw-gold), 0.03) 62%, transparent 78%);
+  background: radial-gradient(ellipse 50% 42% at 50% 50%, rgba(var(--pw-accent-1), 0.2), rgba(var(--pw-accent-2), 0.08) 45%, rgba(var(--pw-gold), 0.03) 62%, transparent 78%);
 }
 
 /* Floating signal particles — indigo / purple pair */
 .power .float-node {
-  background: radial-gradient(circle at 35% 35%, rgba(199, 210, 254, 0.9), rgba(var(--pw-indigo), 0.55) 60%, rgba(var(--pw-indigo), 0) 100%);
-  box-shadow: 0 0 14px rgba(var(--pw-indigo), 0.4);
+  background: radial-gradient(circle at 35% 35%, rgba(199, 210, 254, 0.9), rgba(var(--pw-accent-1), 0.55) 60%, rgba(var(--pw-accent-1), 0) 100%);
+  box-shadow: 0 0 14px rgba(var(--pw-accent-1), 0.4);
 }
 
 .power .float-node.violet {
-  background: radial-gradient(circle at 35% 35%, rgba(233, 213, 255, 0.9), rgba(var(--pw-purple), 0.55) 60%, rgba(var(--pw-purple), 0) 100%);
-  box-shadow: 0 0 14px rgba(var(--pw-purple), 0.4);
+  background: radial-gradient(circle at 35% 35%, rgba(233, 213, 255, 0.9), rgba(var(--pw-accent-2), 0.55) 60%, rgba(var(--pw-accent-2), 0) 100%);
+  box-shadow: 0 0 14px rgba(var(--pw-accent-2), 0.4);
 }
 
 .power .section-dark .float-node,
 .power .final-cta .float-node {
-  box-shadow: 0 0 18px rgba(var(--pw-indigo), 0.6);
+  box-shadow: 0 0 18px rgba(var(--pw-accent-1), 0.6);
 }
 
 /* Proof strip — indigo sweep, gradient hairline divider */
@@ -1497,7 +1502,7 @@ main,
 }
 
 .power .proof-strip::before {
-  background: linear-gradient(100deg, transparent, rgba(var(--pw-indigo), 0.09), transparent);
+  background: linear-gradient(100deg, transparent, rgba(var(--pw-accent-1), 0.09), transparent);
 }
 
 .power .proof-strip::after {
@@ -1520,12 +1525,12 @@ main,
 
 /* Section orbs retinted to the indigo family (gold only on Results —
    the tri-color's warm stop is reserved for primary emphasis) */
-.power #pain::after { background: radial-gradient(circle, rgba(var(--pw-purple), 0.14), transparent 70%); }
-.power #how::after { background: radial-gradient(circle, rgba(var(--pw-indigo), 0.15), transparent 70%); }
-.power #features::after { background: radial-gradient(circle, rgba(var(--pw-purple), 0.13), transparent 70%); }
-.power #testimonials::after { background: radial-gradient(circle, rgba(var(--pw-indigo), 0.12), transparent 70%); }
-.power #faq::after { background: radial-gradient(circle, rgba(var(--pw-purple), 0.11), transparent 70%); }
-.power #results::before { background: radial-gradient(circle, rgba(var(--pw-indigo), 0.2), transparent 70%); }
+.power #pain::after { background: radial-gradient(circle, rgba(var(--pw-accent-2), 0.14), transparent 70%); }
+.power #how::after { background: radial-gradient(circle, rgba(var(--pw-accent-1), 0.15), transparent 70%); }
+.power #features::after { background: radial-gradient(circle, rgba(var(--pw-accent-2), 0.13), transparent 70%); }
+.power #testimonials::after { background: radial-gradient(circle, rgba(var(--pw-accent-1), 0.12), transparent 70%); }
+.power #faq::after { background: radial-gradient(circle, rgba(var(--pw-accent-2), 0.11), transparent 70%); }
+.power #results::before { background: radial-gradient(circle, rgba(var(--pw-accent-1), 0.2), transparent 70%); }
 .power #results::after { background: radial-gradient(circle, rgba(var(--pw-gold), 0.1), transparent 70%); }
 
 /* Demo page walkthrough section gets its own drifting orb */
@@ -1539,7 +1544,7 @@ main,
   pointer-events: none;
   right: -120px;
   top: -80px;
-  background: radial-gradient(circle, rgba(var(--pw-indigo), 0.13), transparent 70%);
+  background: radial-gradient(circle, rgba(var(--pw-accent-1), 0.13), transparent 70%);
   animation: orb-drift 18s ease-in-out infinite;
 }
 
@@ -1557,16 +1562,16 @@ main,
 /* Final CTA + footer — deep indigo washes */
 .power .final-cta {
   background:
-    radial-gradient(ellipse at 50% -30%, rgba(var(--pw-indigo), 0.26), transparent 60%),
+    radial-gradient(ellipse at 50% -30%, rgba(var(--pw-accent-1), 0.26), transparent 60%),
     hsl(258, 55%, 6%);
 }
 
 .power .final-cta::before {
-  background: radial-gradient(circle, rgba(var(--pw-indigo), 0.22), transparent 70%);
+  background: radial-gradient(circle, rgba(var(--pw-accent-1), 0.22), transparent 70%);
 }
 
 .power .final-cta::after {
-  background: radial-gradient(circle, rgba(var(--pw-purple), 0.18), transparent 70%);
+  background: radial-gradient(circle, rgba(var(--pw-accent-2), 0.18), transparent 70%);
 }
 
 .power .site-footer {
@@ -1585,15 +1590,14 @@ main,
   pointer-events: none;
 }
 
-/* Glass surfaces — the green-charcoal card fill reads muddy on the
-   indigo canvas, so surfaces go neutral indigo-glass; hovers glow
-   indigo instead of lime. Foreground accents are untouched. */
+/* Glass surfaces — green-charcoal glass matching the lime canvas;
+   hovers glow with the brand accent. Foreground accents untouched. */
 .power .card,
 .power .step,
 .power .stat,
 .power .faq-item,
 .power .vsl-player {
-  background: rgba(10, 7, 26, 0.6);
+  background: rgba(13, 16, 8, 0.6);
   border-color: rgba(255, 255, 255, 0.12);
 }
 
@@ -1604,10 +1608,10 @@ main,
 
 .power .stat:hover {
   border-color: rgba(255, 255, 255, 0.3);
-  background: rgba(17, 12, 42, 0.75);
+  background: rgba(21, 26, 13, 0.75);
 }
 
 .power .vsl-player:hover {
   border-color: rgba(255, 255, 255, 0.3);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 24px 48px -4px rgba(0, 0, 0, 0.6), 0 0 40px rgba(var(--pw-indigo), 0.14);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 24px 48px -4px rgba(0, 0, 0, 0.6), 0 0 40px rgba(var(--pw-accent-1), 0.14);
 }
