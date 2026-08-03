@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BrandMark } from "@/components/site/BrandMark";
 import { SiteFooter } from "@/components/site/SiteFooter";
-import { BgGlobe } from "@/components/site/BgGlobe";
+import { PowerBackdrop } from "@/components/site/PowerBackdrop";
 import { PageMotion } from "@/components/site/PageMotion";
 import { DemoVsl } from "@/components/site/DemoVsl";
 
@@ -14,12 +14,12 @@ export const metadata: Metadata = {
 
 export default function HomePage() {
   return (
-    <>
+    <div className="power">
       <a className="skip-link" href="#main">
         Skip to main content
       </a>
 
-      <BgGlobe />
+      <PowerBackdrop />
 
       <header className="site-nav" id="siteNav">
         <div className="container nav-inner">
@@ -300,6 +300,6 @@ export default function HomePage() {
       <div className="toast-region" id="toastRegion" aria-live="polite" />
 
       <PageMotion />
-    </>
+    </div>
   );
 }

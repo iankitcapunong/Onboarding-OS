@@ -90,7 +90,7 @@ void main() {
 }
 `;
 
-export function BgGlobe() {
+export function BgGlobe({ color = 0xdcf784 }: { color?: number }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -137,7 +137,7 @@ export function BgGlobe() {
       uDistortion: { value: 0.9 },
       uSize: { value: 2.4 },
       uDetail: { value: 0.8 },
-      uColor: { value: new THREE.Color(0xdcf784) },
+      uColor: { value: new THREE.Color(color) },
       uOpacity: { value: 0.5 },
       uMouse: { value: new THREE.Vector2(0, 0) },
     };
@@ -275,7 +275,7 @@ export function BgGlobe() {
         container.removeChild(renderer.domElement);
       }
     };
-  }, []);
+  }, [color]);
 
   return <div className="page-scene" ref={containerRef} aria-hidden="true" />;
 }
