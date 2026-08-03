@@ -25,7 +25,7 @@ uniform vec2 iResolution;
 #define overallSpeed 0.2
 #define gridSmoothWidth 0.015
 #define scale 5.0
-#define lineColor vec4(0.4, 0.2, 0.8, 1.0)
+#define lineColor vec4(0.804, 0.957, 0.388, 1.0) /* brand lime #CDF463 */
 #define bgColor1 (lineColor * 0.12)
 #define bgColor2 (lineColor * 0.03)
 #define minLineWidth 0.02
