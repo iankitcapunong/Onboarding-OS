@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useFeatureGating } from "@/hooks/useFeatureGating";
 import { useToast } from "@/components/app/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
-import { getJSON, scopedKey } from "@/lib/storage";
+import { getJSON, removeJSON, scopedKey } from "@/lib/storage";
 import { ASSISTANT_LIMITS } from "@/lib/featureGating";
 import {
   AssistantRow,
@@ -72,10 +72,11 @@ export default function AssistantsPage() {
       // One-time migration: accounts that only ever used the old
       // Playground have their draft in localStorage and no rows here
       // (accounts that DEPLOYED were backfilled by migration 0006).
+      // The legacy key must be cleared once the account has rows —
+      // otherwise deleting your last assistant resurrects it on reload.
+      const legacyKey = scopedKey("bsl_playground", user?.email || "guest");
       if (list.length === 0) {
-        const legacy = getJSON<LegacyPlaygroundState>(
-          scopedKey("bsl_playground", user?.email || "guest")
-        );
+        const legacy = getJSON<LegacyPlaygroundState>(legacyKey);
         if (legacy?.persona || legacy?.prompt) {
           const { data: created } = await supabase
             .from("assistants")
@@ -89,8 +90,13 @@ export default function AssistantsPage() {
             })
             .select("id, name, first_message, persona, prompt, voice, model, created_at, updated_at")
             .single();
-          if (created) list = [created as AssistantRow];
+          if (created) {
+            list = [created as AssistantRow];
+            removeJSON(legacyKey);
+          }
         }
+      } else {
+        removeJSON(legacyKey);
       }
 
       if (cancelled) return;

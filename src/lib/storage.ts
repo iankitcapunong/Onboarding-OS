@@ -20,3 +20,12 @@ export function setJSON(key: string, value: unknown) {
     // storage unavailable/full — non-fatal, matches original try/catch guards
   }
 }
+
+export function removeJSON(key: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // storage unavailable — non-fatal
+  }
+}
