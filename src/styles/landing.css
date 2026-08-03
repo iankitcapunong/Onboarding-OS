@@ -1395,6 +1395,14 @@ main,
   background: radial-gradient(circle, rgba(var(--pw-indigo), 0.13), rgba(var(--pw-purple), 0.05) 46%, transparent 70%);
 }
 
+/* Layer 2 — the tube scene. funnel.css (imported after this file)
+   redefines .page-scene with z-index -1, which would bury the canvas
+   under the opaque .power-backdrop; the scoped rule restores it to the
+   0-layer so tree order stacks backdrop < scene < veil. */
+.power .page-scene {
+  z-index: 0;
+}
+
 /* Layer 3 — darkened veil above the particle scene (.page-scene sits
    between the two divs in DOM order). Gradient-only: a full-viewport
    backdrop-filter over an animated canvas would tank frame rate. */
