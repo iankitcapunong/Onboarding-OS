@@ -154,7 +154,7 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
         } else {
           toast(
             planKey === "pro"
-              ? `Not enough credits — this needs ${cost} and you have ${creditsLeft}. Top up or wait for next month's reset.`
+              ? `Not enough credits — this needs ${cost} and you have ${creditsLeft}. Your allowance resets next month.`
               : `Not enough trial credits — this needs ${cost} and you have ${creditsLeft}. Upgrade to Pro for more.`
           );
         }

@@ -7,7 +7,16 @@ import { useCredits } from "@/hooks/useCredits";
 import { useToast } from "@/components/app/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
 import { callStripeCheckout, type StripeConfirmResult, type StripeSyncResult } from "@/lib/edgeFunctions";
-import { PLAN_CREDITS } from "@/lib/featureGating";
+import { CREDIT_COSTS, PLAN_CREDITS } from "@/lib/featureGating";
+
+// Friendly names for the CREDIT_COSTS kinds, in display order.
+const CREDIT_COST_LABELS: Record<string, string> = {
+  asset: "Assets",
+  creative: "Creative ads",
+  images: "Image studio",
+  videos: "Video studio",
+  brible: "Brible websites",
+};
 
 const PRO_FEATURES = [
   "Everything unlocked — agent, assistants, tools, integrations",
@@ -15,6 +24,17 @@ const PRO_FEATURES = [
   `${PLAN_CREDITS.pro.toLocaleString()} credits every month`,
   "Cancel anytime from the billing portal",
 ];
+
+// "credits:2026-08" → "August 2026"; the trial's lifetime pot has no month.
+function bucketLabel(bucket: string): string {
+  if (bucket === "credits:trial") return "Free trial pot";
+  const m = bucket.match(/^credits:(\d{4})-(\d{2})$/);
+  if (!m) return bucket;
+  return new Date(Number(m[1]), Number(m[2]) - 1, 1).toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
+}
 
 // useSearchParams() needs a Suspense boundary for static prerendering.
 export default function BillingPage() {
@@ -36,6 +56,38 @@ function BillingContent() {
   const status = searchParams.get("status");
   const sessionId = searchParams.get("session_id");
   const isPro = planKey === "pro";
+
+  /* All-time credit ledger straight from usage_counters (RLS
+     self-select, same read useCredits does): one row per bucket — the
+     trial's lifetime pot plus one row per pro month. Drives the
+     "Previous periods" list; the current bucket's live number comes
+     from useCredits' realtime stream, not this one-shot read. */
+  const [history, setHistory] = useState<{ bucket: string; count: number }[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from("usage_counters")
+      .select("bucket, count")
+      .like("bucket", "credits:%")
+      .then(({ data }: { data: { bucket: string; count: number }[] | null }) => {
+        if (cancelled) return;
+        const rows = (data ?? []).slice().sort((a, b) => {
+          if (a.bucket === "credits:trial") return 1;
+          if (b.bucket === "credits:trial") return -1;
+          return b.bucket.localeCompare(a.bucket);
+        });
+        setHistory(rows);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
+
+  // Mirrors useCredits' bucketFor() — kept in sync by hand.
+  const currentBucket = isPro ? `credits:${new Date().toISOString().slice(0, 7)}` : "credits:trial";
+  const creditsUsed = Math.max(0, creditAllowance - creditsLeft);
+  const usedPct = creditAllowance > 0 ? Math.min(100, Math.round((creditsUsed / creditAllowance) * 100)) : 0;
 
   /* Webhook-free confirmation. Stripe's success redirect carries
      ?session_id=cs_…; hand it to the Edge Function, which verifies the
@@ -157,6 +209,52 @@ function BillingContent() {
           </button>
         )}
       </div>
+
+      {!isAdmin && (
+        <div className="panel" style={{ marginBottom: 14 }}>
+          <h3>Usage</h3>
+          <p className="panel-sub" style={{ marginTop: 4 }}>
+            {isPro
+              ? `${creditsUsed.toLocaleString()} of ${creditAllowance.toLocaleString()} credits used this month — the allowance resets automatically each month.`
+              : `${creditsUsed.toLocaleString()} of ${creditAllowance.toLocaleString()} trial credits used — the trial pot doesn't refill.`}
+          </p>
+          <div className="meter" style={{ marginTop: 10 }}>
+            <div className="meter-fill" style={{ width: `${usedPct}%` }} />
+          </div>
+          <div style={{ marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+            <strong style={{ fontSize: 13.5 }}>What actions cost</strong>
+            <ul className="panel-sub" style={{ margin: "8px 0 0 18px", display: "grid", gap: 6 }}>
+              {Object.entries(CREDIT_COST_LABELS).map(([kind, label]) => (
+                <li key={kind}>
+                  {label} — {CREDIT_COSTS[kind]} credits each
+                </li>
+              ))}
+            </ul>
+            <p className="hint" style={{ marginTop: 8 }}>
+              Conversations on your published assistant links are metered against the period they happen
+              in.
+            </p>
+          </div>
+          {history !== null && history.some((r) => r.bucket !== currentBucket) && (
+            <div style={{ marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+              <strong style={{ fontSize: 13.5 }}>Previous periods</strong>
+              {history
+                .filter((r) => r.bucket !== currentBucket)
+                .map((r) => (
+                  <p key={r.bucket} className="panel-sub" style={{ margin: "8px 0 0" }}>
+                    {bucketLabel(r.bucket)} — {r.count.toLocaleString()} credits used
+                  </p>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Top-up packs are deliberately absent: STRIPE_PRICE_TOPUP_SMALL/
+          LARGE are unset on the server until the packs are priced, so a
+          topup checkout would only error. stripe-checkout + the confirm
+          flow above already handle kind "topup" — surfacing buttons here
+          is all that's left once prices exist. */}
 
       {!isAdmin && !isPro && (
         <div className="panel" style={{ marginBottom: 14 }}>
