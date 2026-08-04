@@ -438,7 +438,7 @@
   border-radius: 50%;
   background: var(--primary);
   border: none;
-  color: #fff;
+  color: var(--primary-ink);
   display: flex;
   align-items: center;
   justify-content: center;
