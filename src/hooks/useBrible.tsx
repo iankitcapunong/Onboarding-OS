@@ -197,6 +197,13 @@ function aiFailureMessage(err: unknown): string {
       // bad key, an unknown model, or a billing problem upstream.
       return `The AI provider rejected the request${err.message ? `: ${err.message}` : " — check the API key and model in Supabase secrets."}`;
     default:
+      // A 546 is Supabase killing the function for exceeding its
+      // resource limits (CPU / memory / wall clock). The isolate dies
+      // mid-request, so there is no JSON body and no `error` code to
+      // switch on — the raw status is the only signal we get.
+      if (err.message?.includes("546")) {
+        return "That build ran too long for the server to finish in one pass — try a smaller site, or one page at a time.";
+      }
       return err.message ? `Brible AI failed: ${err.message}` : "Brible AI is unavailable right now.";
   }
 }
