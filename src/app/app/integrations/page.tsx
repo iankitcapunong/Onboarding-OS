@@ -589,9 +589,14 @@ export default function IntegrationsPage() {
             <p className="panel-sub">
               Each finished conversation appends one row: time, assistant, contact name/email/phone/company,
               summary, and every answer.
+            </p>
+            <p className="panel-sub" style={{ marginTop: 6 }}>
+              One step first: in your sheet click <strong>Share</strong>, set &ldquo;General access&rdquo; to{" "}
+              <strong>Anyone with the link → Editor</strong>, then paste the sheet&rsquo;s URL below.
+              Note this makes the sheet open to anyone who has its link.
               {SHEETS_SA_EMAIL
-                ? ` Share your spreadsheet (Editor access) with ${SHEETS_SA_EMAIL} first — appends are rejected otherwise.`
-                : " Share your spreadsheet (Editor access) with our service-account email first — it's shown in the delivery log if an append is rejected."}
+                ? ` Prefer to keep it private? Share it (Editor access) with ${SHEETS_SA_EMAIL} instead.`
+                : " Prefer to keep it private? Share it (Editor access) with our service-account email instead — it's shown in the delivery log if an append is rejected."}
             </p>
             <div className="field" style={{ marginTop: 10 }}>
               <label htmlFor="sheetName">Name</label>
