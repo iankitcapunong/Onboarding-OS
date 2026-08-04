@@ -2101,7 +2101,7 @@ body.brible-active .app-main { padding: 0; max-width: none; }
   border: none;
   border-radius: 11px;
   background: linear-gradient(135deg, var(--primary), var(--accent));
-  color: #fff;
+  color: var(--primary-ink);
   cursor: pointer;
   transition: filter var(--dur-fast);
 }
@@ -2560,7 +2560,7 @@ body.brible-active .app-main { padding: 0; max-width: none; }
   border: none;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--primary), var(--accent));
-  color: #fff;
+  color: var(--primary-ink);
   cursor: pointer;
   flex-shrink: 0;
   box-shadow: 0 6px 18px rgba(205, 244, 99, 0.5);
@@ -3715,7 +3715,7 @@ body.brible-active .app-main { padding: 0; max-width: none; }
 .plan-pill.active {
   border-color: transparent;
   background: linear-gradient(135deg, var(--primary), var(--accent));
-  color: #fff;
+  color: var(--primary-ink);
   box-shadow: 0 4px 12px rgba(205, 244, 99, 0.3);
 }
 
