@@ -168,6 +168,39 @@ function runGenStep<T>(onStep: StepReporter, key: string, label: string, promise
   );
 }
 
+/* Turns a failed brible call into a sentence that names the actual
+   cause. Every failure used to read "Brible AI is unavailable right
+   now", which hid the difference between an exhausted allowance, an
+   expired trial, a burst rate-limit, and a genuine upstream outage —
+   the four have completely different fixes. A full multi-page build is
+   several server calls (blueprint + shell + one per page), each
+   charged separately, so running out mid-build is the common case. */
+function aiFailureMessage(err: unknown): string {
+  if (!(err instanceof EdgeFunctionError)) {
+    return "Brible AI didn't respond just now.";
+  }
+  switch (err.code) {
+    case "out_of_credits":
+      return `You're out of credits (${err.remaining ?? 0} left), so the AI build stopped partway.`;
+    case "trial_expired":
+      return "Your free trial has ended, so the AI build is switched off.";
+    case "rate_limited":
+      return "Too many AI requests in a short window — wait a minute and try again.";
+    case "bad_output":
+      return "Brible AI returned something unusable this time.";
+    case "refused":
+      return "Brible AI declined this request.";
+    case "openai_error":
+    case "anthropic_error":
+      // err.message is the provider's own error text (the server passes
+      // it through as `detail`) — the one thing that says whether it's a
+      // bad key, an unknown model, or a billing problem upstream.
+      return `The AI provider rejected the request${err.message ? `: ${err.message}` : " — check the API key and model in Supabase secrets."}`;
+    default:
+      return err.message ? `Brible AI failed: ${err.message}` : "Brible AI is unavailable right now.";
+  }
+}
+
 async function callBribleFn<T extends { remaining?: number }>(supabase: Supa, onCredits: (remaining: number) => void, payload: unknown): Promise<T> {
   const d = await callBrible<T>(supabase, payload);
   if (typeof d.remaining === "number") onCredits(d.remaining);
@@ -513,7 +546,7 @@ export function BribleProvider({ children }: { children: React.ReactNode }) {
 
   /* ---- local (non-AI) fallback engine ---- */
   const localFallback = useCallback(
-    (text: string, c: CreativeCtx, firstBuild: boolean, afterAiFailed: boolean) => {
+    (text: string, c: CreativeCtx, firstBuild: boolean, aiFailure: string | null) => {
       const parsed = bribleParse(stateRef.current.spec, text);
       const spec = parsed ? parsed.spec : bribleFallbackSpec(stateRef.current.spec, text);
       if (firstBuild && !spec.themeKey && (c._fromCall || c._fromMemory)) {
@@ -523,7 +556,7 @@ export function BribleProvider({ children }: { children: React.ReactNode }) {
       const out = buildWebsiteHTML(c, specToWebsiteOpts(spec));
       pushVersionAction(text, out);
 
-      const prefix = afterAiFailed ? "Brible AI is unavailable right now, so I used the local engine instead. " : "";
+      const prefix = aiFailure ? `${aiFailure} I used the local engine instead. ` : "";
       let reply: string;
       if (firstBuild) {
         reply = `${prefix}Here's the first version of the ${c.business} site. Built in the ${out.theme} style${
@@ -725,7 +758,7 @@ export function BribleProvider({ children }: { children: React.ReactNode }) {
           }
         } catch (err) {
           if (err instanceof EdgeFunctionError && err.code === "out_of_credits") syncCreditsFromServer(err.remaining ?? 0);
-          localFallback(trimmed, c, firstBuild, true);
+          localFallback(trimmed, c, firstBuild, aiFailureMessage(err));
         }
       } finally {
         generatingRef.current = false;
@@ -766,7 +799,7 @@ export function BribleProvider({ children }: { children: React.ReactNode }) {
       reportStep("local", "Building instantly with the local engine…", "active");
       try {
         const firstBuild = !stateRef.current.versions.length;
-        localFallback(trimmed, ctx, firstBuild, false);
+        localFallback(trimmed, ctx, firstBuild, null);
         reportStep("local", "Building instantly with the local engine…", "done");
       } catch {
         reportStep("local", "Building instantly with the local engine…", "error");
