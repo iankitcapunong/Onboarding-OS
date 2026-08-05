@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "./useAuth";
 import { createClient } from "@/lib/supabase/client";
+import { callProvisionProfile } from "@/lib/edgeFunctions";
 import { ADMIN_EMAILS, FEATURES, FeatureKey, LEGACY_FEATURE_ALIASES, PlanKey, normalizePlan, planLabel } from "@/lib/featureGating";
 
 type RemoteAccess = {
@@ -54,13 +55,39 @@ export function useFeatureGating() {
       });
     }
 
+    /* An account with no profiles row reads as trial_ends_at = null,
+       which the trial countdown renders as "0 days left" on a brand-new
+       account. That is the normal state after signup whenever email
+       confirmation is on: SignupForm can only provision when signUp()
+       returns a session, and with confirmation enabled it doesn't — the
+       user confirms, logs in, and no row was ever created. The Edge
+       Functions' getPlan() backstop only fires once they invoke an AI
+       feature, which is too late to show a correct countdown.
+
+       So provision on first sight of a missing row. It is idempotent
+       server-side (upsert with ignoreDuplicates), runs at most once per
+       mount, and self-heals accounts already created without a row. */
     supabase
       .from("profiles")
       .select("plan, features, trial_ends_at")
       .eq("user_id", userId)
       .maybeSingle()
       .then(({ data }) => {
-        if (!cancelled) apply(data);
+        if (cancelled) return;
+        if (data) {
+          apply(data);
+          return;
+        }
+        callProvisionProfile(supabase)
+          .then((res) => {
+            if (cancelled) return;
+            apply({ plan: res?.plan ?? "trial", features: null, trial_ends_at: res?.trialEndsAt ?? null });
+          })
+          .catch(() => {
+            // Offline or the function is down — fall back to the old
+            // behaviour rather than blocking the whole app shell.
+            if (!cancelled) apply(null);
+          });
       });
 
     const channel = supabase
