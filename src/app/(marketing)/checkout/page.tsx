@@ -71,7 +71,7 @@ export default function CheckoutPage() {
                   <strong>Onboarding OS Pro</strong>
                   <span>After your free trial · monthly</span>
                 </div>
-                <span className="order-price">$297<em>/mo</em></span>
+                <span className="order-price">$97<em>/mo</em></span>
               </div>
               <ul className="price-list order-list">
                 <li>Unlimited onboarding sessions</li>
@@ -86,7 +86,7 @@ export default function CheckoutPage() {
                 <span>Due today</span>
                 <strong>$0.00</strong>
               </div>
-              <p className="order-fine">Your 7-day trial with 3,000 credits is free — no card required, nothing charged automatically. Pro is $297.00/mo when you choose to upgrade, cancel anytime.</p>
+              <p className="order-fine">Your 7-day trial with 3,000 credits is free — no card required, nothing charged automatically. Pro is $97.00/mo when you choose to upgrade, cancel anytime.</p>
               <Link className="order-back" href="/">← Back to the offer</Link>
             </aside>
           </div>
