@@ -86,7 +86,7 @@ export default function SettingsPage() {
               <span className="badge badge-soft">Active</span>
             </div>
             <p className="panel-sub" style={{ margin: "8px 0 0" }}>
-              $297/month · unlimited sessions · 3 curated models · website generation included
+              $297/month · unlimited sessions · 3 curated models
             </p>
           </div>
           <hr className="divider" />

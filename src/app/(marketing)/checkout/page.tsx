@@ -78,7 +78,7 @@ export default function CheckoutPage() {
                 <li>Dashboard, agent logs &amp; analytics</li>
                 <li>AI assistant builder with instant publish</li>
                 <li>Email, ad &amp; landing copy with spintax</li>
-                <li>Website builder + creative studio</li>
+                <li>Creative ad, image &amp; video studios</li>
                 <li>10,000 credits every month</li>
               </ul>
               <hr className="order-divider" />
