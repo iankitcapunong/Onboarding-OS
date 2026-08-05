@@ -26,7 +26,6 @@ export type FeatureKey =
   | "calls"
   | "onboarding"
   | "assets"
-  | "brible"
   | "creative"
   | "images"
   | "videos";
@@ -40,7 +39,6 @@ export const FEATURES: { key: FeatureKey; label: string }[] = [
   { key: "calls", label: "Call logs" },
   { key: "onboarding", label: "Onboarding logs" },
   { key: "assets", label: "Assets" },
-  { key: "brible", label: "Brible websites" },
   { key: "creative", label: "Creative ads" },
   { key: "images", label: "Image studio" },
   { key: "videos", label: "Video studio" },
@@ -73,7 +71,7 @@ export function normalizePlan(plan: string | null | undefined): PlanKey {
 }
 
 // Two-tier pricing: features that call a real, costly upstream API
-// (video generation, brible's multi-call LLM pipeline) charge 50;
+// (video generation, the assistant prompt rewrite) charge 50;
 // everything else charges 10. Mirrored server-side in each Edge
 // Function's own cost table (supabase/functions/*/index.ts — imagegen's
 // FLAT_COST, credits/index.ts's KIND_COST, videogen's FLAT_COST,
@@ -89,6 +87,9 @@ export const CREDIT_COSTS: Record<string, number> = {
   creative: LOW_COST,
   images: LOW_COST,
   videos: HIGH_COST,
+  // The Brible website builder is gone, but the `brible` Edge Function
+  // still serves the Assistants tab's "rewrite this prompt with AI"
+  // action (mode: "rewrite-prompt"), which spends under this key.
   brible: HIGH_COST,
 };
 

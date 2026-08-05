@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from "react
 import { useAuth } from "./useAuth";
 import { getJSON, scopedKey, setJSON } from "@/lib/storage";
 
-export type ActivityType = "call" | "asset" | "creative" | "brible" | "publish" | "system" | "memory";
+export type ActivityType = "call" | "asset" | "creative" | "publish" | "system" | "memory";
 export type ActivityEntry = { t: ActivityType; x: string; ts: number };
 
 type ActivityContextValue = {

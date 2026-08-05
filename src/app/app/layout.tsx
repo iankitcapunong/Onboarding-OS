@@ -5,7 +5,6 @@ import { CreditsProvider } from "@/hooks/useCredits";
 import { MemoryProvider } from "@/hooks/useMemory";
 import { AssetsProvider } from "@/hooks/useAssets";
 import { CallCaptureProvider } from "@/hooks/useCallCapture";
-import { BribleProvider } from "@/hooks/useBrible";
 import { AppShell } from "@/components/app/AppShell";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -18,9 +17,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <MemoryProvider>
                 <CallCaptureProvider>
                   <AssetsProvider>
-                    <BribleProvider>
-                      <AppShell>{children}</AppShell>
-                    </BribleProvider>
+                    <AppShell>{children}</AppShell>
                   </AssetsProvider>
                 </CallCaptureProvider>
               </MemoryProvider>

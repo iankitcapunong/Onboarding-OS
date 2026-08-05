@@ -10,7 +10,7 @@ import { useCredits } from "@/hooks/useCredits";
 import { CreditsExhaustedModal } from "./CreditsExhaustedModal";
 
 /* Server-side gating only ever hid the sidebar LINK — a gated-off client
-   could still type /app/brible into the address bar and use the page.
+   could still type the route into the address bar and use the page.
    This closes that: once the account's real features row has loaded,
    a route whose feature is off bounces to the dashboard. Waiting on
    `loaded` matters — before the fetch resolves, featureOn() answers an

@@ -15,12 +15,11 @@ const CREDIT_COST_LABELS: Record<string, string> = {
   creative: "Creative ads",
   images: "Image studio",
   videos: "Video studio",
-  brible: "Brible websites",
 };
 
 const PRO_FEATURES = [
   "Everything unlocked — agent, assistants, tools, integrations",
-  "Website builder, creative ads, image & video studios",
+  "Creative ads, image & video studios",
   `${PLAN_CREDITS.pro.toLocaleString()} credits every month`,
   "Cancel anytime from the billing portal",
 ];

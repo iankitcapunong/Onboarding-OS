@@ -16,7 +16,6 @@ const ROUTE_TITLES: Record<string, string> = {
   calls: "Call logs",
   onboarding: "Onboarding logs",
   assets: "Assets",
-  brible: "Brible",
   creative: "Creative ads",
   images: "Image studio",
   videos: "Video studio",

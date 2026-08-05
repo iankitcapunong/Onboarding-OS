@@ -13,9 +13,6 @@ const ACT_ICONS: Record<ActivityType, React.ReactNode> = {
   creative: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3L12 3z" /></svg>
   ),
-  brible: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
-  ),
   publish: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" /><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" /></svg>
   ),
@@ -67,7 +64,7 @@ export default function ActivityPage() {
       <div className="page-head">
         <div>
           <h2>Activity</h2>
-          <p className="page-sub">A record of what you do across Onboarding OS. Calls, assets, creatives and Brible builds.</p>
+          <p className="page-sub">A record of what you do across Onboarding OS. Calls, assets and creatives.</p>
         </div>
         <button type="button" className="btn btn-secondary btn-sm" onClick={handleClear}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -83,7 +80,7 @@ export default function ActivityPage() {
           {activity.length === 0 ? (
             <li className="act-empty">
               {ACT_ICONS.system}
-              <p>Nothing logged yet. Capture a call, generate an asset or build with Brible and it shows up here.</p>
+              <p>Nothing logged yet. Capture a call or generate an asset and it shows up here.</p>
             </li>
           ) : (
             activity.map((a) => <ActivityRow key={a.ts} a={a} />)
