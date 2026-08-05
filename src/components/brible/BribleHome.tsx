@@ -125,7 +125,7 @@ export function BribleHome({ onShowBuilder }: { onShowBuilder: () => void }) {
         <h1>
           Build something <span className="bh-love">Brible</span>
         </h1>
-        <p className="bh-sub">Create client websites by chatting with AI. Pre-briefed by your onboarding calls.</p>
+        <p className="bh-sub">Create client websites by describing what you want. Pre-briefed by your onboarding calls.</p>
 
         <form className="bh-promptbox" onSubmit={handleSubmit}>
           <textarea

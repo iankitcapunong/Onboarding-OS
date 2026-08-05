@@ -8,7 +8,9 @@ import { useMemory } from "./useMemory";
 import { useToast } from "@/components/app/ToastProvider";
 import { getJSON, scopedKey, setJSON } from "@/lib/storage";
 import { createClient } from "@/lib/supabase/client";
-import { callBrible, callImagegen, EdgeFunctionError } from "@/lib/edgeFunctions";
+// EdgeFunctionError is still needed: enhanceImages() calls the imagegen
+// service, which is unrelated to the removed brible AI pipeline.
+import { callImagegen, EdgeFunctionError } from "@/lib/edgeFunctions";
 import { buildWebsiteHTML, resolveCreativeCtx, type CreativeCtx, type CreativeFields } from "@/lib/creativeBuilders";
 import type { CapturedFields } from "@/lib/assetTemplates";
 import type { Asset } from "./useAssets";
@@ -16,7 +18,6 @@ import {
   BRIBLE_HELP,
   applyImageSlotUrls,
   bribleActive,
-  bribleEditScope,
   bribleFallbackSpec,
   bribleIsMultiPage,
   bribleParse,
@@ -38,7 +39,6 @@ import {
   sectionOutlineFromHtml,
   setToken,
   specToWebsiteOpts,
-  type BribleBlueprint,
   type BribleChatMessage,
   type BribleGenOutput,
   type BriblePages,
@@ -144,182 +144,6 @@ async function pollBribleImage(supabase: Supa, taskId: string, startTs: number):
   if (Date.now() - startTs > IMAGEGEN_POLL_TIMEOUT_MS) throw new Error("Timed out waiting for the image");
   await new Promise((resolve) => setTimeout(resolve, IMAGEGEN_POLL_MS));
   return pollBribleImage(supabase, taskId, startTs);
-}
-
-/* ---- AI pipeline: blueprint-first, multi-page generation. plan
-   (mode:"blueprint") -> shared nav/footer/design-token shell
-   (mode:"shell") -> each page's full HTML document (mode:"page"), pages
-   run with bounded concurrency (pool of 3). Module-level (see the
-   genBribleImage note above for why) — supabase/onCredits/onStep are
-   threaded through explicitly instead of closed over. */
-type StepReporter = (key: string, label: string, state: GenStepState) => void;
-
-function runGenStep<T>(onStep: StepReporter, key: string, label: string, promise: Promise<T>): Promise<T> {
-  onStep(key, label, "active");
-  return promise.then(
-    (v) => {
-      onStep(key, label, "done");
-      return v;
-    },
-    (e: unknown) => {
-      onStep(key, label, "error");
-      throw e;
-    }
-  );
-}
-
-/* Turns a failed brible call into a sentence that names the actual
-   cause. Every failure used to read "Brible AI is unavailable right
-   now", which hid the difference between an exhausted allowance, an
-   expired trial, a burst rate-limit, and a genuine upstream outage —
-   the four have completely different fixes. A full multi-page build is
-   several server calls (blueprint + shell + one per page), each
-   charged separately, so running out mid-build is the common case. */
-function aiFailureMessage(err: unknown): string {
-  if (!(err instanceof EdgeFunctionError)) {
-    return "Brible AI didn't respond just now.";
-  }
-  switch (err.code) {
-    case "out_of_credits":
-      return `You're out of credits (${err.remaining ?? 0} left), so the AI build stopped partway.`;
-    case "trial_expired":
-      return "Your free trial has ended, so the AI build is switched off.";
-    case "rate_limited":
-      return "Too many AI requests in a short window — wait a minute and try again.";
-    case "bad_output":
-      return "Brible AI returned something unusable this time.";
-    case "refused":
-      return "Brible AI declined this request.";
-    case "openai_error":
-    case "anthropic_error":
-      // err.message is the provider's own error text (the server passes
-      // it through as `detail`) — the one thing that says whether it's a
-      // bad key, an unknown model, or a billing problem upstream.
-      return `The AI provider rejected the request${err.message ? `: ${err.message}` : " — check the API key and model in Supabase secrets."}`;
-    default:
-      // A 546 is Supabase killing the function for exceeding its
-      // resource limits (CPU / memory / wall clock). The isolate dies
-      // mid-request, so there is no JSON body and no `error` code to
-      // switch on — the raw status is the only signal we get.
-      if (err.message?.includes("546")) {
-        return "That build ran too long for the server to finish in one pass — try a smaller site, or one page at a time.";
-      }
-      return err.message ? `Brible AI failed: ${err.message}` : "Brible AI is unavailable right now.";
-  }
-}
-
-async function callBribleFn<T extends { remaining?: number }>(supabase: Supa, onCredits: (remaining: number) => void, payload: unknown): Promise<T> {
-  const d = await callBrible<T>(supabase, payload);
-  if (typeof d.remaining === "number") onCredits(d.remaining);
-  return d;
-}
-
-async function aiBlueprint(
-  supabase: Supa,
-  onCredits: (remaining: number) => void,
-  text: string,
-  c: CreativeCtx,
-  currentBlueprint: BribleBlueprint | null
-): Promise<BribleBlueprint> {
-  const d = await callBribleFn<{ blueprint: BribleBlueprint; remaining?: number }>(supabase, onCredits, {
-    mode: "blueprint",
-    instruction: text,
-    context: c,
-    currentBlueprint: currentBlueprint || null,
-  });
-  return d.blueprint;
-}
-
-async function aiShell(supabase: Supa, onCredits: (remaining: number) => void, c: CreativeCtx, blueprint: BribleBlueprint): Promise<string> {
-  const d = await callBribleFn<{ shell: string; remaining?: number }>(supabase, onCredits, {
-    mode: "shell",
-    instruction: "Build the shared shell for this site.",
-    context: c,
-    blueprint,
-  });
-  return d.shell;
-}
-
-async function aiPage(
-  supabase: Supa,
-  onCredits: (remaining: number) => void,
-  c: CreativeCtx,
-  blueprint: BribleBlueprint,
-  shell: string,
-  slug: string,
-  instruction: string,
-  currentPageHtml: string | null
-): Promise<string> {
-  const d = await callBribleFn<{ html: string; remaining?: number }>(supabase, onCredits, {
-    mode: "page",
-    instruction,
-    context: c,
-    blueprint,
-    shell,
-    targetSlug: slug,
-    currentPageHtml: currentPageHtml || null,
-  });
-  return d.html;
-}
-
-// first build, or a site-scope edit: (re)plans the blueprint, builds the
-// shared shell, then builds every page concurrently (pool of 3)
-async function generateSiteAI(
-  supabase: Supa,
-  onCredits: (remaining: number) => void,
-  onStep: StepReporter,
-  text: string,
-  c: CreativeCtx,
-  reuseBlueprint: BribleBlueprint | null
-): Promise<BribleGenOutput> {
-  const blueprint = await runGenStep(onStep, "blueprint", "Planning the site structure…", aiBlueprint(supabase, onCredits, text, c, reuseBlueprint));
-  const shell = await runGenStep(onStep, "shell", "Designing the shared navigation…", aiShell(supabase, onCredits, c, blueprint));
-  const bpPages = blueprint.pages || [];
-  const results = await concurrentMap(bpPages, 3, async (p) => {
-    const html = await runGenStep(
-      onStep,
-      `page:${p.slug}`,
-      `Building ${p.name || p.slug}…`,
-      aiPage(supabase, onCredits, c, blueprint, shell, p.slug, text, null)
-    );
-    return { slug: p.slug, html };
-  });
-  const pagesMap: BriblePages = {};
-  results.forEach((r) => {
-    pagesMap[r.slug] = r.html;
-  });
-  const activeSlug = pagesMap.home ? "home" : bpPages[0]?.slug || Object.keys(pagesMap)[0];
-  return {
-    blueprint,
-    shellHtml: shell,
-    pages: pagesMap,
-    activeSlug,
-    theme: "AI",
-    html: activeSlug ? pagesMap[activeSlug] : undefined,
-    spec: null,
-  };
-}
-
-// page-scope edit: rebuild only the active page against the existing
-// blueprint + shell, leaving every other page untouched
-async function generatePageAI(
-  supabase: Supa,
-  onCredits: (remaining: number) => void,
-  onStep: StepReporter,
-  text: string,
-  c: CreativeCtx,
-  v: BribleVersion,
-  slug: string
-): Promise<BribleGenOutput> {
-  const pages = bribleVPages(v);
-  const html = await runGenStep(
-    onStep,
-    `page:${slug}`,
-    "Rewriting this page…",
-    aiPage(supabase, onCredits, c, v.blueprint as BribleBlueprint, v.shellHtml as string, slug, text, pages[slug] || null)
-  );
-  const newPages = { ...pages, [slug]: html };
-  return { blueprint: v.blueprint, shellHtml: v.shellHtml, pages: newPages, activeSlug: slug, theme: v.themeKey, html, spec: v.spec };
 }
 
 /* ---- public interface contract — see BRIBLE_ENGINE_API.md for the
@@ -551,9 +375,14 @@ export function BribleProvider({ children }: { children: React.ReactNode }) {
     [applyState, logActivity, ctx, rememberPref]
   );
 
-  /* ---- local (non-AI) fallback engine ---- */
+  /* ---- the site builder: a deterministic, client-side template engine.
+     Brible's AI path (blueprint -> shell -> per-page generation through
+     the `brible` Edge Function) was removed — it kept dying on
+     Supabase's function resource limits (HTTP 546) and charged 50
+     credits per underlying call while doing it. This engine renders
+     instantly, costs nothing, and needs no server. ---- */
   const localFallback = useCallback(
-    (text: string, c: CreativeCtx, firstBuild: boolean, aiFailure: string | null) => {
+    (text: string, c: CreativeCtx, firstBuild: boolean) => {
       const parsed = bribleParse(stateRef.current.spec, text);
       const spec = parsed ? parsed.spec : bribleFallbackSpec(stateRef.current.spec, text);
       if (firstBuild && !spec.themeKey && (c._fromCall || c._fromMemory)) {
@@ -563,16 +392,15 @@ export function BribleProvider({ children }: { children: React.ReactNode }) {
       const out = buildWebsiteHTML(c, specToWebsiteOpts(spec));
       pushVersionAction(text, out);
 
-      const prefix = aiFailure ? `${aiFailure} I used the local engine instead. ` : "";
       let reply: string;
       if (firstBuild) {
-        reply = `${prefix}Here's the first version of the ${c.business} site. Built in the ${out.theme} style${
+        reply = `Here's the first version of the ${c.business} site. Built in the ${out.theme} style${
           c._fromCall ? " from your onboarding call" : ""
         }. Tell me what to change: colors, sections, headline, anything. When you're happy, hit Publish.`;
       } else if (parsed) {
-        reply = `${prefix}Done. ${parsed.changes.join(", ")}. Saved as v${stateRef.current.versions.length}.`;
+        reply = `Done. ${parsed.changes.join(", ")}. Saved as v${stateRef.current.versions.length}.`;
       } else {
-        reply = `${prefix}I don't have a specific rule for that yet, so I folded it straight into the messaging instead of leaving the site unchanged. Saved as v${stateRef.current.versions.length}. ${BRIBLE_HELP}`;
+        reply = `I don't have a specific rule for that yet, so I folded it straight into the messaging instead of leaving the site unchanged. Saved as v${stateRef.current.versions.length}. ${BRIBLE_HELP}`;
       }
       addMessage("bot", reply);
     },
@@ -698,7 +526,8 @@ export function BribleProvider({ children }: { children: React.ReactNode }) {
       const trimmed = text.trim();
       if (!trimmed) return;
       if (generatingRef.current) return;
-      if (!spendCredits("brible", 1)) return;
+      // No credit charge: building is local now, so there's no upstream
+      // API call to pay for. (It used to spend 50 — the AI tier.)
 
       addMessage("user", trimmed);
       generatingRef.current = true;
@@ -732,40 +561,12 @@ export function BribleProvider({ children }: { children: React.ReactNode }) {
         }
 
         const firstBuild = !stateRef.current.versions.length;
-        const activeV = bribleActive(stateRef.current);
-        const editScope = bribleEditScope(trimmed, scope);
-        const isSiteScope = firstBuild || editScope === "site" || !(activeV && activeV.blueprint);
-
+        reportStep("local", "Building the site…", "active");
         try {
-          if (isSiteScope) {
-            const prevSlugs = activeV ? Object.keys(bribleVPages(activeV)) : [];
-            const out = await generateSiteAI(supabase, syncCreditsFromServer, reportStep, trimmed, c, activeV?.blueprint ?? null);
-            pushVersionAction(trimmed, out);
-            const n = Object.keys(out.pages || {}).length;
-            addMessage(
-              "bot",
-              (firstBuild
-                ? `Here's the first version of the ${c.business} site, designed from scratch with Brible AI${
-                    c._fromCall ? " from your onboarding call" : ""
-                  } — ${n} ${n === 1 ? "page" : "pages"}.`
-                : `Done. Rebuilt ${n} ${n === 1 ? "page" : "pages"} to keep everything consistent.`) +
-                ` Saved as v${stateRef.current.versions.length}. Tell me what to change next, or hit Publish when you're happy.`
-            );
-            // background, non-blocking: only newly-created pages get real
-            // AI images generated for them
-            Object.keys(out.pages || {}).forEach((slug) => {
-              if (prevSlugs.indexOf(slug) === -1) void enhanceImages(slug);
-            });
-          } else {
-            const slug = bribleVActiveSlug(activeV);
-            if (!slug) throw new Error("no-active-page");
-            const out = await generatePageAI(supabase, syncCreditsFromServer, reportStep, trimmed, c, activeV as BribleVersion, slug);
-            pushVersionAction(trimmed, out);
-            addMessage("bot", `Done. Updated this page. Saved as v${stateRef.current.versions.length}.`);
-          }
-        } catch (err) {
-          if (err instanceof EdgeFunctionError && err.code === "out_of_credits") syncCreditsFromServer(err.remaining ?? 0);
-          localFallback(trimmed, c, firstBuild, aiFailureMessage(err));
+          localFallback(trimmed, c, firstBuild);
+          reportStep("local", "Building the site…", "done");
+        } catch {
+          reportStep("local", "Building the site…", "error");
         }
       } finally {
         generatingRef.current = false;
@@ -775,16 +576,10 @@ export function BribleProvider({ children }: { children: React.ReactNode }) {
     [
       ctx,
       selection,
-      scope,
-      spendCredits,
       addMessage,
       resetGenProgress,
-      pushVersionAction,
-      enhanceImages,
       localFallback,
       applySelEditInternal,
-      supabase,
-      syncCreditsFromServer,
       reportStep,
     ]
   );
@@ -806,7 +601,7 @@ export function BribleProvider({ children }: { children: React.ReactNode }) {
       reportStep("local", "Building instantly with the local engine…", "active");
       try {
         const firstBuild = !stateRef.current.versions.length;
-        localFallback(trimmed, ctx, firstBuild, null);
+        localFallback(trimmed, ctx, firstBuild);
         reportStep("local", "Building instantly with the local engine…", "done");
       } catch {
         reportStep("local", "Building instantly with the local engine…", "error");

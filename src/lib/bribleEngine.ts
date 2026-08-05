@@ -302,11 +302,11 @@ export function bribleFallbackSpec(currentSpec: BribleSpec | null, text: string)
 export const BRIBLE_HELP =
   'I can restyle it ("make it dark and premium", "warm and friendly", "ocean blue"), change the hero ("full-width photo hero"), ' +
   'add or remove sections ("add pricing", "add FAQ", "add a gallery"), set copy (headline to "...", button to "..."), ' +
-  'or redesign from scratch ("surprise me"). Deploy the Brible AI function to unlock free-form editing.';
+  'or redesign from scratch ("surprise me").';
 
 export function bribleWelcomeText(ctx: CreativeCtx): string {
   return (
-    `Hey! I'm Brible. Your AI website builder. I already know ${ctx.business}` +
+    `Hey! I'm Brible. Your website builder. I already know ${ctx.business}` +
     (ctx._fromCall ? " from your onboarding call" : " (demo details until you run an onboarding call)") +
     `: ${ctx.offer} for ${ctx.audience}. Say “Build my website” or describe exactly what you want.`
   );
