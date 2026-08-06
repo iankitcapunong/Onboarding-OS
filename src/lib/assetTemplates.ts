@@ -6,7 +6,7 @@ export type CapturedFields = {
   voice?: string;
 };
 
-export type AssetType = "Email copy" | "Ad copy" | "Landing page copy" | "Website";
+export type AssetType = "Email copy" | "Ad copy" | "SMS copy" | "Landing page copy" | "Website";
 
 /* spintax: {option A|option B} picks one variant per spin. Braces
    without a pipe (merge fields like {first name}) are kept. */
@@ -106,6 +106,28 @@ export function buildContent(type: Exclude<AssetType, "Website">, c: CapturedFie
       `Beat 1: The problem. Why ${goal} feels out of reach.`,
       `Beat 2: The shift. What changes with ${offer}.`,
       `CTA: "{Tap the link|Hit the link|Tap below} to see how ${biz} can help."`,
+    ].join("\n");
+  }
+
+  if (type === "SMS copy") {
+    return [
+      `# SMS copy · ${biz}`,
+      `Welcome, follow-up & booking texts · Voice: ${voice} · Spintax enabled`,
+      "",
+      "## SMS 1 · Welcome",
+      `{Hi|Hey} {first name}, it's ${biz}. {Great to have you|Glad you're here}. If you're ${aud}, ${offer} was built for you. Reply YES and we'll send your next step.`,
+      "",
+      "## SMS 2 · Value",
+      `{Quick one|Quick tip}, {first name}: most people stall on ${goal} by trying to fix everything at once. ${cap(offer)} focuses on the one thing that moves it. {Want the details?|Want a look?} Reply INFO.`,
+      "",
+      "## SMS 3 · Booking",
+      `{first name}, your free consult with ${biz} takes 20 minutes and you leave with next steps either way. {Grab a time here|Pick a time that suits}: {booking link}`,
+      "",
+      "## SMS 4 · Reminder",
+      `{Friendly nudge|Quick reminder}, {first name}: your call with ${biz} is coming up. Reply C to confirm or R to reschedule. {See you soon.|Talk soon.}`,
+      "",
+      "## SMS 5 · Re-engagement",
+      `{Still thinking it over|Been a while}, {first name}? ${cap(goal)} doesn't have to wait. The door's open when you're ready: {booking link}. Reply STOP to opt out.`,
     ].join("\n");
   }
 
