@@ -12,6 +12,8 @@ import {
   AssistantRow,
   DeploymentRow,
   DEFAULT_ASSISTANT,
+  ASSISTANT_TEMPLATES,
+  applyIndustry,
   errorMessage,
   stripVoiceBlock,
 } from "@/lib/assistantTemplate";
@@ -27,6 +29,18 @@ export default function AssistantsPage() {
   const [assistants, setAssistants] = useState<AssistantRow[] | null>(null);
   const [deployments, setDeployments] = useState<Record<string, DeploymentRow>>({});
   const [busy, setBusy] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickedId, setPickedId] = useState(ASSISTANT_TEMPLATES[0].id);
+  const [industry, setIndustry] = useState(ASSISTANT_TEMPLATES[0].defaultIndustry);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    function onEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") setPickerOpen(false);
+    }
+    document.addEventListener("keydown", onEscape);
+    return () => document.removeEventListener("keydown", onEscape);
+  }, [pickerOpen]);
 
   const assistantLimit = ASSISTANT_LIMITS[planKey];
 
@@ -121,19 +135,28 @@ export default function AssistantsPage() {
     };
   }, [user, supabase, toast]);
 
+  function openPicker() {
+    if (busy || atAssistantCap()) return;
+    setPickedId(ASSISTANT_TEMPLATES[0].id);
+    setIndustry(ASSISTANT_TEMPLATES[0].defaultIndustry);
+    setPickerOpen(true);
+  }
+
   async function handleNew() {
+    const tpl = ASSISTANT_TEMPLATES.find((t) => t.id === pickedId) ?? ASSISTANT_TEMPLATES[0];
     if (!user || busy || atAssistantCap()) return;
     setBusy(true);
     try {
+      const filled = applyIndustry(tpl, industry);
       const { data, error } = await supabase
         .from("assistants")
         .insert({
           user_id: user.id,
           name: "Untitled assistant",
-          first_message: DEFAULT_ASSISTANT.first_message,
-          persona: DEFAULT_ASSISTANT.persona,
-          prompt: DEFAULT_ASSISTANT.prompt,
-          voice: DEFAULT_ASSISTANT.voice,
+          first_message: filled.first_message,
+          persona: filled.persona,
+          prompt: filled.prompt,
+          voice: filled.voice,
         })
         .select("id")
         .single();
@@ -228,7 +251,7 @@ export default function AssistantsPage() {
             public link serves the new version instantly.
           </p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={handleNew} disabled={busy}>
+        <button type="button" className="btn btn-primary" onClick={openPicker} disabled={busy}>
           <span className="btn-label">New assistant</span>
         </button>
       </div>
@@ -244,7 +267,7 @@ export default function AssistantsPage() {
             Create your first AI onboarding assistant — set its persona and prompt, then publish it to get
             a shareable link.
           </p>
-          <button type="button" className="btn btn-primary" style={{ marginTop: 12 }} onClick={handleNew} disabled={busy}>
+          <button type="button" className="btn btn-primary" style={{ marginTop: 12 }} onClick={openPicker} disabled={busy}>
             <span className="btn-label">Create your first assistant</span>
           </button>
         </div>
@@ -291,6 +314,81 @@ export default function AssistantsPage() {
             </div>
           );
         })
+      )}
+
+      {pickerOpen && (
+        <div
+          className="modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPickerOpen(false);
+          }}
+        >
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="tplPickerTitle" style={{ maxWidth: 520 }}>
+            <div className="modal-head">
+              <div className="modal-id">
+                <div>
+                  <h3 id="tplPickerTitle">New assistant</h3>
+                  <p className="panel-sub">Start from a template — the questions stay the same, only the industry changes.</p>
+                </div>
+              </div>
+              <button type="button" className="modal-close" aria-label="Close" onClick={() => setPickerOpen(false)}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{ display: "grid", gap: 10 }}>
+                {ASSISTANT_TEMPLATES.map((t) => {
+                  const active = t.id === pickedId;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        setPickedId(t.id);
+                        setIndustry(t.defaultIndustry);
+                      }}
+                      aria-pressed={active}
+                      className="panel"
+                      style={{
+                        textAlign: "left",
+                        cursor: "pointer",
+                        margin: 0,
+                        outline: active ? "2px solid currentColor" : "none",
+                        opacity: active ? 1 : 0.75,
+                      }}
+                    >
+                      <strong>{t.label}</strong>
+                      <p className="panel-sub" style={{ margin: "4px 0 0" }}>{t.blurb}</p>
+                    </button>
+                  );
+                })}
+                <label style={{ display: "grid", gap: 6 }}>
+                  <strong>Industry</strong>
+                  <input
+                    className="input"
+                    type="text"
+                    value={industry}
+                    maxLength={60}
+                    placeholder="e.g. SaaS, concrete construction, window cleaning"
+                    onChange={(e) => setIndustry(e.currentTarget.value)}
+                  />
+                  <span className="panel-sub">Swapped into the persona and prompt — everything else is ready to publish.</span>
+                </label>
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button type="button" className="btn btn-secondary" onClick={() => setPickerOpen(false)} disabled={busy}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-primary" onClick={handleNew} disabled={busy}>
+                <span className="btn-label">{busy ? "Creating…" : "Create assistant"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

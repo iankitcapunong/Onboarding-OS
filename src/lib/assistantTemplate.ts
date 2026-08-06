@@ -29,6 +29,80 @@ export const DEFAULT_ASSISTANT = {
   voice: "warm, direct, and plain-spoken — no hype, no jargon",
 };
 
+/* Pre-made starting points for the "New assistant" picker. The
+   question flow is deliberately identical across industries — the
+   [INDUSTRY] token is the only thing that changes, swapped in by
+   applyIndustry() before the row is inserted. DEFAULT_ASSISTANT
+   stays untouched above: the legacy-Playground migration and field
+   fallbacks still read it. */
+
+export const INDUSTRY_TOKEN = "[INDUSTRY]";
+
+export type AssistantTemplate = {
+  id: string;
+  label: string;
+  blurb: string;
+  defaultIndustry: string;
+  first_message: string;
+  persona: string;
+  prompt: string;
+  voice: string;
+};
+
+export function applyIndustry(tpl: AssistantTemplate, industry: string) {
+  const ind = industry.trim() || tpl.defaultIndustry;
+  const swap = (s: string) => s.split(INDUSTRY_TOKEN).join(ind);
+  return {
+    first_message: swap(tpl.first_message),
+    persona: swap(tpl.persona),
+    prompt: swap(tpl.prompt),
+    voice: tpl.voice,
+  };
+}
+
+export const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
+  {
+    id: "saas-client-onboarding",
+    label: "Client onboarding · SaaS",
+    blurb: "Onboards a newly signed client — offer, ICP, goals and brand voice — through a natural conversation.",
+    defaultIndustry: "SaaS",
+    first_message:
+      "Welcome aboard! Great to have you with us. Before we set anything up, I'd love to understand your business — what does your company do?",
+    persona:
+      "You are the client-onboarding specialist for a [INDUSTRY] company. " +
+      "You onboard newly signed customers so the team can deliver from day " +
+      "one. You are warm, direct, and plain-spoken. No hype, no jargon. You " +
+      "sound like a sharp customer-success lead who respects the client's time.",
+    prompt:
+      "Your job is to onboard a newly signed [INDUSTRY] client through a natural CONVERSATION, never a form.\n\n" +
+      "Run it in this order:\n" +
+      "1. Greet briefly, then ask ONE question: their business and what they do.\n" +
+      "2. Collect what matters, one question at a time:\n" +
+      "   - their main offer and how it's priced\n" +
+      "   - their ideal customer (ICP) and target market\n" +
+      "   - their #1 goal for the next 90 days\n" +
+      "   - their brand voice — how they want to sound to customers\n" +
+      "   - the tools they use today and where things get stuck\n" +
+      "3. Ask ONE question at a time. Never stack questions.\n" +
+      "4. Reflect back what you heard in plain words and confirm it.\n" +
+      "5. Close with clear next steps and a warm goodbye.",
+    voice: "warm, direct, and plain-spoken — no hype, no jargon",
+  },
+  {
+    id: "client-onboarding",
+    label: "Client onboarding · universal",
+    blurb: DEFAULT_ASSISTANT.blurb,
+    defaultIndustry: "AI marketing systems",
+    first_message: DEFAULT_ASSISTANT.first_message,
+    persona:
+      "You are the onboarding agent for a [INDUSTRY] company. " +
+      "You are warm, direct, and plain-spoken. No hype, no jargon. You sound " +
+      "like a sharp operations lead who respects the client's time.",
+    prompt: DEFAULT_ASSISTANT.prompt,
+    voice: DEFAULT_ASSISTANT.voice,
+  },
+];
+
 /* The old Playground folded the voice into the prompt as a trailing
    "VOICE:" block AND stored it separately, and agent-talk appends voice
    again at serve time — so deployed system prompts carried it twice.
