@@ -2,6 +2,14 @@
 
 import { useEffect } from "react";
 import { useSheetLog } from "@/hooks/useSheetLog";
+import { useToast } from "@/components/app/ToastProvider";
+
+/* Cells are joined with a delimiter per row; quoting only when the cell
+   contains the delimiter, quotes or newlines, so Excel/Sheets open it clean. */
+function joinRows(rows: string[][], cols: number, delim: string): string {
+  const esc = (v: string) => (v.includes(delim) || /["\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  return rows.map((row) => Array.from({ length: cols }, (_, c) => esc(row[c] || "")).join(delim)).join("\r\n");
+}
 
 export function SheetLogPanel({
   sheet,
@@ -15,6 +23,35 @@ export function SheetLogPanel({
   unit: string;
 }) {
   const { rows, loading, error, refresh } = useSheetLog(sheet);
+  const toast = useToast();
+
+  function handleDownload() {
+    if (!rows || rows.length === 0) return;
+    const cols = rows.reduce((m, r) => Math.max(m, r.length), 0);
+    /* BOM so Excel detects UTF-8 */
+    const blob = new Blob(["\uFEFF" + joinRows(rows, cols, ",")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${sheet}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast("CSV downloaded", true);
+  }
+
+  async function handleCopy() {
+    if (!rows || rows.length === 0) return;
+    const cols = rows.reduce((m, r) => Math.max(m, r.length), 0);
+    try {
+      /* tab-separated so a paste lands in spreadsheet cells */
+      await navigator.clipboard.writeText(joinRows(rows, cols, "\t"));
+      toast("Copied to clipboard — paste straight into a spreadsheet", true);
+    } catch {
+      toast("Couldn't copy. Try Download CSV instead");
+    }
+  }
 
   useEffect(() => {
     refresh();
@@ -39,13 +76,34 @@ export function SheetLogPanel({
           </h3>
           <p className="panel-sub">Synced from the Google Sheet {title.toLowerCase()}</p>
         </div>
-        <button type="button" className={`btn btn-secondary btn-sm${loading ? " sheet-loading" : ""}`} onClick={refresh}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-            <polyline points="21 3 21 9 15 9" />
-          </svg>
-          Refresh
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {entries.length > 0 && (
+            <>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={handleCopy}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                </svg>
+                Copy
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={handleDownload}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" x2="12" y1="15" y2="3" />
+                </svg>
+                Download CSV
+              </button>
+            </>
+          )}
+          <button type="button" className={`btn btn-secondary btn-sm${loading ? " sheet-loading" : ""}`} onClick={refresh}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+              <polyline points="21 3 21 9 15 9" />
+            </svg>
+            Refresh
+          </button>
+        </div>
       </div>
 
       {rows && entries.length > 0 ? (
