@@ -3,13 +3,7 @@
 import { useEffect } from "react";
 import { useSheetLog } from "@/hooks/useSheetLog";
 import { useToast } from "@/components/app/ToastProvider";
-
-/* Cells are joined with a delimiter per row; quoting only when the cell
-   contains the delimiter, quotes or newlines, so Excel/Sheets open it clean. */
-function joinRows(rows: string[][], cols: number, delim: string): string {
-  const esc = (v: string) => (v.includes(delim) || /["\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-  return rows.map((row) => Array.from({ length: cols }, (_, c) => esc(row[c] || "")).join(delim)).join("\r\n");
-}
+import { copyTable, downloadCsv } from "@/lib/csv";
 
 export function SheetLogPanel({
   sheet,
@@ -27,30 +21,14 @@ export function SheetLogPanel({
 
   function handleDownload() {
     if (!rows || rows.length === 0) return;
-    const cols = rows.reduce((m, r) => Math.max(m, r.length), 0);
-    /* BOM so Excel detects UTF-8 */
-    const blob = new Blob(["\uFEFF" + joinRows(rows, cols, ",")], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${sheet}-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    downloadCsv(rows, `${sheet}-${new Date().toISOString().slice(0, 10)}.csv`);
     toast("CSV downloaded", true);
   }
 
   async function handleCopy() {
     if (!rows || rows.length === 0) return;
-    const cols = rows.reduce((m, r) => Math.max(m, r.length), 0);
-    try {
-      /* tab-separated so a paste lands in spreadsheet cells */
-      await navigator.clipboard.writeText(joinRows(rows, cols, "\t"));
-      toast("Copied to clipboard — paste straight into a spreadsheet", true);
-    } catch {
-      toast("Couldn't copy. Try Download CSV instead");
-    }
+    if (await copyTable(rows)) toast("Copied to clipboard — paste straight into a spreadsheet", true);
+    else toast("Couldn't copy. Try Download CSV instead");
   }
 
   useEffect(() => {

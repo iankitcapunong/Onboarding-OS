@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/app/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
 import { errorMessage } from "@/lib/assistantTemplate";
+import { copyTable, downloadCsv } from "@/lib/csv";
 
 type ToolRow = {
   id: string;
@@ -167,6 +168,33 @@ export default function ToolsPage() {
     return assistants.find((a) => a.id === tool.assistant_id)?.name ?? "Deleted assistant";
   }
 
+  // Signing secrets are deliberately left out of the export.
+  function exportRows(): string[][] {
+    return [
+      ["Name", "Endpoint URL", "Fires for", "Events", "Status", "Created"],
+      ...(tools ?? []).map((t) => [
+        t.name,
+        t.config.url || "",
+        scopeLabel(t),
+        (t.config.events || []).join(", "),
+        t.enabled ? "On" : "Off",
+        new Date(t.created_at).toLocaleString(),
+      ]),
+    ];
+  }
+
+  function handleDownloadCsv() {
+    if (!tools?.length) return;
+    downloadCsv(exportRows(), `webhooks-${new Date().toISOString().slice(0, 10)}.csv`);
+    toast("CSV downloaded", true);
+  }
+
+  async function handleCopyTable() {
+    if (!tools?.length) return;
+    if (await copyTable(exportRows())) toast("Copied to clipboard — paste straight into a spreadsheet", true);
+    else toast("Couldn't copy. Try Download CSV instead");
+  }
+
   return (
     <>
       <div className="page-head">
@@ -178,9 +206,30 @@ export default function ToolsPage() {
             Native GoHighLevel, Google Sheets, and Zapier live on the Integrations tab.
           </p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={() => setFormOpen((v) => !v)}>
-          <span className="btn-label">{formOpen ? "Cancel" : "Add webhook"}</span>
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {(tools?.length ?? 0) > 0 && (
+            <>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={handleCopyTable}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                </svg>
+                Copy
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={handleDownloadCsv}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" x2="12" y1="15" y2="3" />
+                </svg>
+                Download CSV
+              </button>
+            </>
+          )}
+          <button type="button" className="btn btn-primary" onClick={() => setFormOpen((v) => !v)}>
+            <span className="btn-label">{formOpen ? "Cancel" : "Add webhook"}</span>
+          </button>
+        </div>
       </div>
 
       {freshSecret && (
