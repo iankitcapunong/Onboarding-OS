@@ -38,11 +38,30 @@ export const DEFAULT_ASSISTANT = {
 
 export const INDUSTRY_TOKEN = "[INDUSTRY]";
 
+/* Dropdown choices for templates that aren't tied to one industry —
+   the picker adds an "Other…" option that falls back to free text. */
+export const INDUSTRY_OPTIONS = [
+  "AI marketing systems",
+  "SaaS",
+  "Marketing agency",
+  "E-commerce",
+  "Real estate",
+  "Construction",
+  "Home services",
+  "Coaching & consulting",
+  "Healthcare",
+  "Legal services",
+  "Financial services",
+  "Fitness & wellness",
+];
+
 export type AssistantTemplate = {
   id: string;
   label: string;
   blurb: string;
   defaultIndustry: string;
+  /* When set, the picker shows these in a dropdown instead of a free-text field. */
+  industryOptions?: string[];
   first_message: string;
   persona: string;
   prompt: string;
@@ -93,6 +112,7 @@ export const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
     label: "Client onboarding · universal",
     blurb: DEFAULT_ASSISTANT.blurb,
     defaultIndustry: "AI marketing systems",
+    industryOptions: INDUSTRY_OPTIONS,
     first_message: DEFAULT_ASSISTANT.first_message,
     persona:
       "You are the onboarding agent for a [INDUSTRY] company. " +

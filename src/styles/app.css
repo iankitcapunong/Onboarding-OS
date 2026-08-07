@@ -1586,6 +1586,31 @@
   border-top: 1px solid var(--border);
 }
 
+/* ---- New-assistant template picker ----
+   The cards are <button class="panel tpl-card"> — buttons don't inherit
+   the page text color (the UA default is near-black), so without an
+   explicit color the labels vanish on the dark glass panel. */
+.tpl-card {
+  width: 100%;
+  margin: 0;
+  padding: 14px 16px;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+  animation: none;
+  transition: border-color var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.tpl-card strong { font-size: 14.5px; }
+
+.tpl-card:hover { border-color: var(--border-strong); }
+
+.tpl-card[aria-pressed="true"] {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
 /* ---- spintax controls in the asset viewer ---- */
 .modal-spinbar {
   display: flex;
@@ -2826,6 +2851,9 @@
 
 /* Modal */
 .app-body .modal { background: rgba(24, 28, 18, 0.97); backdrop-filter: blur(18px); }
+/* Native option popups ignore the select's translucent background —
+   without fixed colors they render light-on-light. */
+.app-body select.input option { background: #1c2014; color: var(--ink); }
 .app-body .modal-head { border-bottom-color: rgba(236,244,214,0.1); }
 .app-body .modal-foot { border-top-color: rgba(236,244,214,0.1); }
 .app-body .modal-spinbar { background: rgba(255,255,255,0.03); border-bottom-color: rgba(236,244,214,0.08); }

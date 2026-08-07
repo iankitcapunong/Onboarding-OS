@@ -20,6 +20,8 @@ import {
 
 type LegacyPlaygroundState = { persona?: string; voice?: string; prompt?: string };
 
+const OTHER_INDUSTRY = "__other__";
+
 export default function AssistantsPage() {
   const { user } = useAuth();
   const { isAdmin, planKey } = useFeatureGating();
@@ -32,6 +34,7 @@ export default function AssistantsPage() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickedId, setPickedId] = useState(ASSISTANT_TEMPLATES[0].id);
   const [industry, setIndustry] = useState(ASSISTANT_TEMPLATES[0].defaultIndustry);
+  const [industryOther, setIndustryOther] = useState(false);
 
   useEffect(() => {
     if (!pickerOpen) return;
@@ -139,6 +142,7 @@ export default function AssistantsPage() {
     if (busy || atAssistantCap()) return;
     setPickedId(ASSISTANT_TEMPLATES[0].id);
     setIndustry(ASSISTANT_TEMPLATES[0].defaultIndustry);
+    setIndustryOther(false);
     setPickerOpen(true);
   }
 
@@ -240,6 +244,8 @@ export default function AssistantsPage() {
     if (navigator.clipboard) navigator.clipboard.writeText(link);
     toast("Link copied", true);
   }
+
+  const pickedTpl = ASSISTANT_TEMPLATES.find((t) => t.id === pickedId) ?? ASSISTANT_TEMPLATES[0];
 
   return (
     <>
@@ -349,16 +355,10 @@ export default function AssistantsPage() {
                       onClick={() => {
                         setPickedId(t.id);
                         setIndustry(t.defaultIndustry);
+                        setIndustryOther(false);
                       }}
                       aria-pressed={active}
-                      className="panel"
-                      style={{
-                        textAlign: "left",
-                        cursor: "pointer",
-                        margin: 0,
-                        outline: active ? "2px solid currentColor" : "none",
-                        opacity: active ? 1 : 0.75,
-                      }}
+                      className="panel tpl-card"
                     >
                       <strong>{t.label}</strong>
                       <p className="panel-sub" style={{ margin: "4px 0 0" }}>{t.blurb}</p>
@@ -367,14 +367,47 @@ export default function AssistantsPage() {
                 })}
                 <label style={{ display: "grid", gap: 6 }}>
                   <strong>Industry</strong>
-                  <input
-                    className="input"
-                    type="text"
-                    value={industry}
-                    maxLength={60}
-                    placeholder="e.g. SaaS, concrete construction, window cleaning"
-                    onChange={(e) => setIndustry(e.currentTarget.value)}
-                  />
+                  {pickedTpl.industryOptions ? (
+                    <select
+                      className="input"
+                      value={industryOther ? OTHER_INDUSTRY : industry}
+                      onChange={(e) => {
+                        const value = e.currentTarget.value;
+                        if (value === OTHER_INDUSTRY) {
+                          setIndustryOther(true);
+                          setIndustry("");
+                        } else {
+                          setIndustryOther(false);
+                          setIndustry(value);
+                        }
+                      }}
+                    >
+                      {pickedTpl.industryOptions.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                      <option value={OTHER_INDUSTRY}>Other…</option>
+                    </select>
+                  ) : (
+                    <input
+                      className="input"
+                      type="text"
+                      value={industry}
+                      maxLength={60}
+                      placeholder="e.g. SaaS, concrete construction, window cleaning"
+                      onChange={(e) => setIndustry(e.currentTarget.value)}
+                    />
+                  )}
+                  {pickedTpl.industryOptions && industryOther && (
+                    <input
+                      className="input"
+                      type="text"
+                      value={industry}
+                      maxLength={60}
+                      autoFocus
+                      placeholder="e.g. concrete construction, window cleaning"
+                      onChange={(e) => setIndustry(e.currentTarget.value)}
+                    />
+                  )}
                   <span className="panel-sub">Swapped into the persona and prompt — everything else is ready to publish.</span>
                 </label>
               </div>
