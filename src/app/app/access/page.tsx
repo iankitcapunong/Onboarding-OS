@@ -14,7 +14,7 @@ import {
   EdgeFunctionError,
   type AdminClient,
 } from "@/lib/edgeFunctions";
-import { ADMIN_EMAILS, FEATURES, planLabel, type FeatureKey, type PlanKey } from "@/lib/featureGating";
+import { ADMIN_EMAILS, FEATURES, featureDefault, planLabel, type FeatureKey, type PlanKey } from "@/lib/featureGating";
 
 const PLAN_OPTIONS: { key: PlanKey; label: string }[] = [
   { key: "trial", label: "Free trial" },
@@ -25,10 +25,15 @@ function initials(email: string) {
   return email.slice(0, 2).toUpperCase();
 }
 
+/* Must resolve exactly like useFeatureGating's myFeatures: toggleFeature
+   persists this whole object, so a mismatched default here would get
+   written out as an explicit flag the first time an admin touches any
+   unrelated toggle. */
 function fullFlags(overrides: Partial<Record<FeatureKey, boolean>> | null): Record<FeatureKey, boolean> {
   const flags = {} as Record<FeatureKey, boolean>;
   FEATURES.forEach((f) => {
-    flags[f.key] = overrides ? overrides[f.key] !== false : true;
+    const flag = overrides?.[f.key];
+    flags[f.key] = flag === undefined ? featureDefault(f.key) : flag !== false;
   });
   return flags;
 }
@@ -115,7 +120,7 @@ function ClientRow({
     setFlags(fullFlags(null));
     void persist({ features: null });
     logActivity("system", `Reset access for ${client.email}`);
-    toast(`${name} reset to full access`, true);
+    toast(`${name} reset to default access`, true);
   }
 
   async function adjustCredits(sign: 1 | -1) {

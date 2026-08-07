@@ -44,6 +44,18 @@ export const FEATURES: { key: FeatureKey; label: string }[] = [
   { key: "videos", label: "Video studio" },
 ];
 
+/* Features that launch disabled: clients only get these once an admin
+   explicitly switches them on in Client Access (the Aug 6 launch review
+   parked Creative Ads as a future fulfillment upsell — unproven
+   performance). Admins bypass gating entirely, so they still see and
+   use these routes. An explicit admin toggle — on OR off — always wins
+   over this default. */
+export const DEFAULT_OFF_FEATURES: FeatureKey[] = ["creative"];
+
+export function featureDefault(key: FeatureKey): boolean {
+  return !DEFAULT_OFF_FEATURES.includes(key);
+}
+
 // A features blob written before the Assistants/Logs/Tools/Integrations
 // tabs existed has no entry for them — inherit the nearest legacy flag
 // (first alias that's explicitly set wins) instead of defaulting a

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "./useAuth";
 import { createClient } from "@/lib/supabase/client";
 import { callProvisionProfile } from "@/lib/edgeFunctions";
-import { ADMIN_EMAILS, FEATURES, FeatureKey, LEGACY_FEATURE_ALIASES, PlanKey, normalizePlan, planLabel } from "@/lib/featureGating";
+import { ADMIN_EMAILS, FEATURES, FeatureKey, LEGACY_FEATURE_ALIASES, PlanKey, featureDefault, normalizePlan, planLabel } from "@/lib/featureGating";
 
 type RemoteAccess = {
   plan: PlanKey;
@@ -118,7 +118,7 @@ export function useFeatureGating() {
     const myFeatures = {} as Record<FeatureKey, boolean>;
     FEATURES.forEach((f) => {
       if (!overrides) {
-        myFeatures[f.key] = true;
+        myFeatures[f.key] = featureDefault(f.key);
         return;
       }
       let flag = overrides[f.key];
@@ -132,7 +132,7 @@ export function useFeatureGating() {
           }
         }
       }
-      myFeatures[f.key] = flag !== false;
+      myFeatures[f.key] = flag === undefined ? featureDefault(f.key) : flag !== false;
     });
 
     function featureOn(key: string) {
