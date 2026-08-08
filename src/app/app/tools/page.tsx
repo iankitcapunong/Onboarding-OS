@@ -64,8 +64,11 @@ export default function ToolsPage() {
   const [name, setName] = useState("Webhook");
   const [url, setUrl] = useState("");
   const [scope, setScope] = useState("all");
-  // Shown exactly once, right after creation.
-  const [freshSecret, setFreshSecret] = useState<string | null>(null);
+  /* Which row currently has its signing secret on screen. Secrets are
+     owner-readable by design (migration 0008) and already travel with
+     the list query, so revealing one is a disclosure, not a one-time
+     ceremony — a newly created webhook just starts revealed. */
+  const [revealedId, setRevealedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -122,7 +125,7 @@ export default function ToolsPage() {
         .single();
       if (error) throw error;
       setTools((prev) => [...(prev ?? []), data as ToolRow]);
-      setFreshSecret(secret);
+      setRevealedId((data as ToolRow).id);
       setFormOpen(false);
       setName("Webhook");
       setUrl("");
@@ -189,6 +192,19 @@ export default function ToolsPage() {
     toast("CSV downloaded", true);
   }
 
+  async function copySecret(tool: ToolRow) {
+    const secret = tool.config.secret;
+    if (!secret) return;
+    try {
+      await navigator.clipboard.writeText(secret);
+      toast("Signing secret copied", true);
+    } catch {
+      // Clipboard is blocked outside a secure context / without permission —
+      // the field is selectable, so say that rather than failing silently.
+      toast("Couldn't copy — select the secret and copy it manually");
+    }
+  }
+
   async function handleCopyTable() {
     if (!tools?.length) return;
     if (await copyTable(exportRows())) toast("Copied to clipboard — paste straight into a spreadsheet", true);
@@ -231,32 +247,6 @@ export default function ToolsPage() {
           </button>
         </div>
       </div>
-
-      {freshSecret && (
-        <div className="panel" style={{ marginBottom: 14, borderColor: "var(--primary)" }}>
-          <h3>Copy your signing secret now</h3>
-          <p className="panel-sub">
-            It&rsquo;s shown only this once. Each delivery is signed with it —
-            header <code>X-BSL-Signature</code>, hex HMAC-SHA256 of the raw body.
-          </p>
-          <div className="field" style={{ display: "flex", gap: 8, marginTop: 10 }}>
-            <input className="input" readOnly value={freshSecret} onFocus={(e) => e.currentTarget.select()} />
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => {
-                if (navigator.clipboard) navigator.clipboard.writeText(freshSecret);
-                toast("Secret copied", true);
-              }}
-            >
-              Copy
-            </button>
-          </div>
-          <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 10 }} onClick={() => setFreshSecret(null)}>
-            I&rsquo;ve saved it
-          </button>
-        </div>
-      )}
 
       {formOpen && (
         <form className="panel" style={{ marginBottom: 14 }} onSubmit={handleCreate}>
@@ -328,6 +318,44 @@ export default function ToolsPage() {
                 </button>
               </div>
             </div>
+
+            {tool.config.secret && (
+              <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  aria-expanded={revealedId === tool.id}
+                  onClick={() => setRevealedId(revealedId === tool.id ? null : tool.id)}
+                >
+                  {revealedId === tool.id ? "Hide signing secret" : "Reveal signing secret"}
+                </button>
+                {revealedId === tool.id && (
+                  <>
+                    <div className="field" style={{ display: "flex", gap: 8, margin: "10px 0 0" }}>
+                      <input
+                        className="input"
+                        readOnly
+                        aria-label={`Signing secret for ${tool.name}`}
+                        value={tool.config.secret}
+                        onFocus={(e) => e.currentTarget.select()}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => copySecret(tool)}
+                      >
+                        Copy
+                      </button>
+                    </div>
+                    <p className="hint" style={{ marginTop: 6 }}>
+                      Every delivery is signed with this — header <code>X-BSL-Signature</code>, hex
+                      HMAC-SHA256 of the raw body. Keep it out of anything public; it&rsquo;s how your
+                      endpoint knows the POST is really us.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         ))
       )}
