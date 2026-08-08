@@ -3,6 +3,8 @@
    data (ids, ratios, res, durs, audioKey/audioDefault, needsRef/allowsRef,
    api, veoModel, input()) identical to the vanilla source. */
 
+import { videoCreditCost } from "@/lib/featureGating";
+
 export type VideoApi = "veo" | "jobs";
 
 export type VideoGenParams = {
@@ -33,6 +35,14 @@ export type VideoModel = {
   needsRef?: boolean;
   allowsRef?: boolean;
 };
+
+/* What one render on this model costs the user. The upstream kie.ai
+   model string is the price key (see VIDEO_MODEL_COSTS) — it's the field
+   the videogen Edge Function reads off the body it proxies, so client and
+   server land on the same number for the same request. */
+export function modelCreditCost(m: VideoModel): number {
+  return videoCreditCost(m.api === "veo" ? m.veoModel : m.model);
+}
 
 export const MODELS: VideoModel[] = [
   {

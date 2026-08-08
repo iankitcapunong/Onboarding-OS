@@ -2118,6 +2118,14 @@
   color: var(--primary-ink);
 }
 
+/* Video models don't all cost the same — premium ones run several times
+   a standard render, so the price rides along with the vendor name. */
+.ig-cost {
+  font-weight: 600;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
 /* Prompt */
 .ig-prompt {
   resize: vertical;

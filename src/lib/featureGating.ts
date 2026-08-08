@@ -105,6 +105,35 @@ export const CREDIT_COSTS: Record<string, number> = {
   brible: HIGH_COST,
 };
 
+/* Per-model surcharges for the video studio. Video is the one feature
+   whose upstream price swings by 5x between models, so the flat
+   CREDIT_COSTS.videos can't cover it: Veo 3.1 costs kie.ai $2.00 a
+   render while every other model runs $0.40. At the flat 50 credits
+   (≈$0.49 of plan value) each premium render lost ≈$1.50, so the
+   2026-08-07 pricing call repriced it rather than dropping the model.
+
+   Keyed by the UPSTREAM kie.ai model string — VideoModel.veoModel on the
+   veo API, VideoModel.model on the jobs API — because that's the one
+   identifier the server also sees, on the request body it proxies.
+   MIRRORED SERVER-SIDE in supabase/functions/videogen/index.ts's
+   VIDEO_MODEL_COSTS, which is the actual enforcement point; this copy
+   drives the optimistic pre-check and the price on the model picker.
+   Keep them in sync by hand — same trap as CREDIT_COSTS above.
+
+   Anything absent falls back to CREDIT_COSTS.videos, so a NEW premium
+   model must be added here (and server-side) or it underbills. */
+export const VIDEO_MODEL_COSTS: Record<string, number> = {
+  veo3: 250,
+};
+
+export function videoCreditCost(upstreamModel: string | null | undefined): number {
+  const premium =
+    upstreamModel && Object.prototype.hasOwnProperty.call(VIDEO_MODEL_COSTS, upstreamModel)
+      ? VIDEO_MODEL_COSTS[upstreamModel]
+      : undefined;
+  return typeof premium === "number" ? premium : CREDIT_COSTS.videos;
+}
+
 export function planLabel(key: PlanKey | null) {
   return key === "pro" ? "Pro" : "Free trial";
 }

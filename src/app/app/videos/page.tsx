@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { EdgeFunctionError } from "@/lib/edgeFunctions";
 import { getJSON, scopedKey, setJSON } from "@/lib/storage";
 import { CreditsLockedPage } from "@/components/app/CreditsLockedPage";
-import { MODELS, type VideoModel } from "@/components/videos/models";
+import { MODELS, modelCreditCost, type VideoModel } from "@/components/videos/models";
 import { POLL_MS, POLL_TIMEOUT_MS, createTask, checkTask, type VideoItem, type CheckResult } from "@/components/videos/api";
 import { GalleryCard } from "@/components/videos/GalleryCard";
 import { Lightbox } from "@/components/videos/Lightbox";
@@ -245,7 +245,10 @@ export default function VideoStudioPage() {
       return;
     }
 
-    if (!spendCredits("videos", 1)) return;
+    // Premium models (Veo 3.1) cost several times a standard render, so
+    // the price comes from the model, not the flat "videos" kind — the
+    // videogen Edge Function charges the same way off the model it proxies.
+    if (!spendCredits("videos", 1, modelCreditCost(m))) return;
 
     const params = {
       prompt,
@@ -320,7 +323,9 @@ export default function VideoStudioPage() {
                   {model.name}
                   {model.tag ? <span className="ig-tag">{model.tag}</span> : null}
                 </strong>
-                <span className="ig-vendor">{model.vendor}</span>
+                <span className="ig-vendor">
+                  {model.vendor} · <span className="ig-cost">{modelCreditCost(model)} credits</span>
+                </span>
               </button>
             ))}
           </div>
@@ -437,7 +442,9 @@ export default function VideoStudioPage() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <polygon points="6 3 20 12 6 21 6 3" />
             </svg>
-            <span className="btn-label">{busy ? "Starting…" : "Generate video"}</span>
+            <span className="btn-label">
+              {busy ? "Starting…" : `Generate video · ${modelCreditCost(m)} credits`}
+            </span>
           </button>
           <p className="hint ig-foot">Videos can take 1–10 minutes · Powered by kie.ai</p>
         </div>

@@ -25,7 +25,9 @@ type CreditsContextValue = {
   upgradeModalOpen: boolean;
   openUpgradeModal: () => void;
   closeUpgradeModal: () => void;
-  spendCredits: (kind: string, count?: number) => boolean;
+  /** `unitCost` overrides the kind's flat CREDIT_COSTS price — used by the
+      video studio, where the per-model price varies (videoCreditCost()). */
+  spendCredits: (kind: string, count?: number, unitCost?: number) => boolean;
   syncCreditsFromServer: (remaining: number) => void;
 };
 
@@ -138,13 +140,13 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
   const closeUpgradeModal = useCallback(() => setUpgradeModalOpen(false), []);
 
   const spendCredits = useCallback(
-    (kind: string, count = 1) => {
+    (kind: string, count = 1, unitCost?: number) => {
       if (isAdmin) return true;
       if (trialExpired) {
         setUpgradeModalOpen(true);
         return false;
       }
-      const cost = (CREDIT_COSTS[kind] || 0) * count;
+      const cost = (unitCost ?? CREDIT_COSTS[kind] ?? 0) * count;
       if (creditsLeft < cost) {
         // Fully out → the billing modal; partially short (some credits
         // left, just not enough for this action) → an explanatory toast,

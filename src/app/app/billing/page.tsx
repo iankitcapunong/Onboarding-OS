@@ -8,6 +8,7 @@ import { useToast } from "@/components/app/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
 import { callStripeCheckout, type StripeConfirmResult, type StripeSyncResult } from "@/lib/edgeFunctions";
 import { CREDIT_COSTS, PLAN_CREDITS } from "@/lib/featureGating";
+import { MODELS, modelCreditCost } from "@/components/videos/models";
 
 // Friendly names for the CREDIT_COSTS kinds, in display order.
 const CREDIT_COST_LABELS: Record<string, string> = {
@@ -16,6 +17,14 @@ const CREDIT_COST_LABELS: Record<string, string> = {
   images: "Image studio",
   videos: "Video studio",
 };
+
+/* Video is the one kind whose price varies by model, so the flat
+   CREDIT_COSTS.videos line above would understate a Veo 3.1 render.
+   Derived from the catalogue rather than restated, so adding a premium
+   model surfaces here without another edit. */
+const PREMIUM_VIDEO_MODELS = MODELS.filter((m) => modelCreditCost(m) !== CREDIT_COSTS.videos).map(
+  (m) => `${m.name} at ${modelCreditCost(m)}`
+);
 
 const PRO_FEATURES = [
   "Everything unlocked — agent, assistants, tools, integrations",
@@ -226,6 +235,9 @@ function BillingContent() {
               {Object.entries(CREDIT_COST_LABELS).map(([kind, label]) => (
                 <li key={kind}>
                   {label} — {CREDIT_COSTS[kind]} credits each
+                  {kind === "videos" && PREMIUM_VIDEO_MODELS.length > 0 && (
+                    <> (premium models cost more — {PREMIUM_VIDEO_MODELS.join(", ")})</>
+                  )}
                 </li>
               ))}
             </ul>
