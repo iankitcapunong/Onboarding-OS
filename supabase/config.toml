@@ -1,0 +1,55 @@
+# BSL 2.0 — Supabase project config.
+# Committed so the auth requirement on every Edge Function is auditable
+# in-repo instead of only living in the dashboard. project_id must match
+# the project this repo deploys to (see supabase/functions/brible/index.ts
+# header comment for the `supabase link` command).
+project_id = "xuqmlxjubpkntwvghgki"
+
+[functions.brible]
+verify_jwt = true
+
+[functions.imagegen]
+verify_jwt = true
+
+[functions.videogen]
+verify_jwt = true
+
+[functions.sheets-log]
+verify_jwt = true
+
+[functions.credits]
+verify_jwt = true
+
+[functions.provision-profile]
+verify_jwt = true
+
+[functions.admin-clients]
+verify_jwt = true
+
+# Public — powers the anonymous "/talk/<slug>" page. There is no signed-in
+# visitor to verify a JWT for; the slug is the only credential, and
+# agent-talk/index.ts meters usage against the deploying account's own
+# rate limit + credits instead.
+[functions.agent-talk]
+verify_jwt = false
+
+# Public — the landing page's VSL lead modal runs for anonymous visitors,
+# so there's no JWT to verify. lead-capture/index.ts validates input and
+# throttles inserts against the leads table itself.
+[functions.lead-capture]
+verify_jwt = false
+
+[functions.stripe-checkout]
+verify_jwt = true
+
+[functions.integration-test]
+verify_jwt = true
+
+# UNUSED in the webhook-free flow: plan/credits are applied by
+# stripe-checkout's "confirm"/"sync" actions, which pull session state
+# from Stripe directly. Kept as an optional backstop — only becomes
+# live if an endpoint is registered in the Stripe dashboard and
+# STRIPE_WEBHOOK_SECRET is set. Public because Stripe has no Supabase
+# JWT; authenticity is the signature over the raw body.
+[functions.stripe-webhook]
+verify_jwt = false

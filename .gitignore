@@ -36,6 +36,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# supabase cli local state (holds the linked project ref)
+supabase/.temp/
+supabase/.branches/
+
 # large media — ideally externalized to a CDN/Supabase Storage, but
 # committed directly for now so the demo VSL deploys with the app
 

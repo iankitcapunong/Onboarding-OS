@@ -1,0 +1,25 @@
+-- BSL 2.0 — per-user feature overrides, server-side.
+--
+-- Feature gating (which sidebar items/routes a client sees) has lived
+-- only in the ADMIN's OWN browser localStorage (bsl_features:<email>) —
+-- meaning an admin's toggles never reached the client's own device, and
+-- the "Client access" list only ever showed whatever had been poked at
+-- locally. This column gives it a real per-account home next to `plan`.
+--
+-- Nullable, no default: null means "no override — full access", which
+-- matches src/lib/featureGating.ts's loadAccessFor() default for any
+-- account nobody has ever configured (every key defaults enabled unless
+-- explicitly set to false). An admin narrows access by writing an
+-- explicit object here (via the admin-clients Edge Function); there is
+-- no separate "plan preset" column — public.profiles.plan already
+-- serves that role for credit allowance, and continues to for the
+-- Client access page's plan pills.
+--
+-- No RLS policy change: `profiles: self select` (0001) already covers
+-- every column of the caller's own row, including this one, so a
+-- signed-in user's own useFeatureGating() read needs nothing new. Only
+-- service_role (the new admin-clients Edge Function) ever writes it —
+-- there is no self-update policy on profiles at all today, so clients
+-- cannot self-grant themselves features via this column either.
+alter table public.profiles
+  add column if not exists features jsonb;

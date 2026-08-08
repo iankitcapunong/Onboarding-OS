@@ -30,5 +30,11 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  // supabase/ holds the Deno Edge Functions and SQL migrations, which
+  // moved here so the product lives in one repository. They are NOT part
+  // of the Next.js program: Deno resolves imports with explicit .ts
+  // extensions and provides its own globals, so type-checking them with
+  // the app's config fails the build. They deploy via the Supabase CLI,
+  // which type-checks them itself.
+  "exclude": ["node_modules", "supabase"]
 }
