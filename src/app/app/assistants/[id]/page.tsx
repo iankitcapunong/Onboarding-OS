@@ -9,6 +9,7 @@ import { useCredits } from "@/hooks/useCredits";
 import { useToast } from "@/components/app/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
 import { callBrible } from "@/lib/edgeFunctions";
+import { FIELD_LIMITS } from "@/lib/featureGating";
 import { AssistantRow, DeploymentRow, errorMessage, stripVoiceBlock } from "@/lib/assistantTemplate";
 
 function randomSlug() {
@@ -306,6 +307,7 @@ export default function AssistantEditorPage({ params }: { params: Promise<{ id: 
               className="input pp-editor"
               rows={3}
               spellCheck={false}
+              maxLength={FIELD_LIMITS.first_message}
               value={assistant.first_message}
               onChange={(e) => patch({ first_message: e.target.value })}
             />
@@ -318,6 +320,7 @@ export default function AssistantEditorPage({ params }: { params: Promise<{ id: 
               rows={3}
               placeholder="e.g. warm, direct, a little playful — no corporate jargon"
               spellCheck={false}
+              maxLength={FIELD_LIMITS.voice}
               value={assistant.voice}
               onChange={(e) => patch({ voice: e.target.value })}
             />
@@ -328,6 +331,7 @@ export default function AssistantEditorPage({ params }: { params: Promise<{ id: 
               className="input pp-editor"
               rows={5}
               spellCheck={false}
+              maxLength={FIELD_LIMITS.persona}
               value={assistant.persona}
               onChange={(e) => patch({ persona: e.target.value })}
             />
@@ -338,6 +342,7 @@ export default function AssistantEditorPage({ params }: { params: Promise<{ id: 
               className="input pp-editor pp-mono"
               rows={16}
               spellCheck={false}
+              maxLength={FIELD_LIMITS.prompt}
               value={assistant.prompt}
               onChange={(e) => patch({ prompt: e.target.value })}
             />

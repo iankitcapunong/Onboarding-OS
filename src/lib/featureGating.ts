@@ -126,6 +126,21 @@ export const VIDEO_MODEL_COSTS: Record<string, number> = {
   veo3: 250,
 };
 
+/* Per-field ceilings for a published assistant. Every /talk turn feeds
+   these to the model and bills the same flat rate whatever their size, so
+   without a cap one account could drive real API spend inside its own
+   credit allowance. ENFORCED in the database by the
+   agent_deployments_prompt_size constraint (migration 0012) — publishing
+   is a direct browser insert, so that is the only place it can't be
+   skipped; these values exist to stop the editor from letting someone
+   type past it and meet a raw constraint error on save. Keep in sync. */
+export const FIELD_LIMITS = {
+  persona: 4000,
+  prompt: 12000,
+  voice: 2000,
+  first_message: 2000,
+} as const;
+
 export function videoCreditCost(upstreamModel: string | null | undefined): number {
   const premium =
     upstreamModel && Object.prototype.hasOwnProperty.call(VIDEO_MODEL_COSTS, upstreamModel)

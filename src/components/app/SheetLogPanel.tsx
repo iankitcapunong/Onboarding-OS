@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { useSheetLog } from "@/hooks/useSheetLog";
 import { useToast } from "@/components/app/ToastProvider";
 import { copyTable, downloadCsv } from "@/lib/csv";
@@ -16,7 +17,7 @@ export function SheetLogPanel({
   emptyMsg: React.ReactNode;
   unit: string;
 }) {
-  const { rows, loading, error, refresh } = useSheetLog(sheet);
+  const { rows, loading, error, notConfigured, refresh } = useSheetLog(sheet);
   const toast = useToast();
 
   function handleDownload() {
@@ -52,7 +53,11 @@ export function SheetLogPanel({
               </span>
             )}
           </h3>
-          <p className="panel-sub">Synced from the Google Sheet {title.toLowerCase()}</p>
+          <p className="panel-sub">
+            {notConfigured
+              ? "Connect your Google Sheet to see this log"
+              : `Synced from the Google Sheet ${title.toLowerCase()}`}
+          </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {entries.length > 0 && (
@@ -127,7 +132,15 @@ export function SheetLogPanel({
                 <path d="M3 9h18" />
                 <path d="M9 21V9" />
               </svg>
-              <p>{emptyMsg}</p>
+              {notConfigured ? (
+                <p>
+                  This log reads your own Google Sheet.{" "}
+                  <Link href="/app/integrations">Connect one on the Integrations tab</Link> and every
+                  finished onboarding lands there — then it shows up here.
+                </p>
+              ) : (
+                <p>{emptyMsg}</p>
+              )}
             </div>
           )}
         </div>
